@@ -4,7 +4,12 @@ export const MODES = ["ask", "analyze", "review", "refactor", "plan", "test"] as
 export type Mode = (typeof MODES)[number];
 
 export const SCHEMA_VERSION = 1;
-export const DEFAULT_TIMEOUT_MS = 120_000;
+/**
+ * Measured: summarizing a 4000-line log takes ~95s, because Gemini has to read past the 2000-line
+ * attachment limit itself. 120s left almost no headroom, so a big file burned a full timeout
+ * before Claude retried with a larger one.
+ */
+export const DEFAULT_TIMEOUT_MS = 180_000;
 export const MIN_TIMEOUT_MS = 5_000;
 export const MAX_TIMEOUT_MS = 30 * 60_000;
 /** Rough chars-per-token ratio used only for the "context saved" estimate. */

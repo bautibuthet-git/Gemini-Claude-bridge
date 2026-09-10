@@ -44,7 +44,7 @@ describe("StateStore", () => {
     const state = await new StateStore(file).read();
     expect(state.enabled).toBe(false);
     expect(state.usage).toEqual(defaultState().usage);
-    expect(state.preferences.timeoutMs).toBe(120_000);
+    expect(state.preferences.timeoutMs).toBe(180_000);
   });
 
   it("backs up and resets a corrupt file, and warns exactly once", async () => {

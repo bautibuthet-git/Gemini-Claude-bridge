@@ -1,5 +1,14 @@
 import { describe, expect, it } from "vitest";
-import { buildPrompt, escapeAtSigns, GUARDRAIL, MODE_PREFIXES, toAtReference } from "../../src/gemini/promptBuilder.js";
+import {
+  ATTACHED_LINE_LIMIT,
+  buildPrompt,
+  escapeAtSigns,
+  fileReferenceLine,
+  GUARDRAIL,
+  MODE_PREFIXES,
+  toAtReference,
+  TRUNCATION_NOTICE,
+} from "../../src/gemini/promptBuilder.js";
 import { MODES } from "../../src/state/schema.js";
 
 // Copied verbatim from Gemini CLI 0.59 (atCommandProcessor / paths utils) to pin the contract our
@@ -24,6 +33,20 @@ describe("toAtReference", () => {
   });
 });
 
+describe("fileReferenceLine", () => {
+  it("says how much of a long file is missing", () => {
+    expect(fileReferenceLine({ path: "C:\\a.log", lines: 4000 }, "win32")).toBe(
+      `@"C:\\a.log" (4000 lines, only the first ${ATTACHED_LINE_LIMIT} attached)`,
+    );
+  });
+
+  it("just states the size of a fully attached file, and stays bare when the count is unknown", () => {
+    expect(fileReferenceLine({ path: "C:\\a.ts", lines: 120 }, "win32")).toBe('@"C:\\a.ts" (120 lines)');
+    expect(fileReferenceLine({ path: "C:\\dir", lines: null }, "win32")).toBe('@"C:\\dir"');
+    expect(fileReferenceLine({ path: "C:\\dir" }, "win32")).toBe('@"C:\\dir"');
+  });
+});
+
 describe("escapeAtSigns", () => {
   it("escapes bare @ so the CLI doesn't treat it as a file reference", () => {
     expect(escapeAtSigns("mail me@x.com about @Component and @scope/pkg")).toBe(
@@ -38,7 +61,7 @@ describe("escapeAtSigns", () => {
 
 describe("buildPrompt", () => {
   it("ask mode is just the trimmed task plus the guardrail", () => {
-    expect(buildPrompt({ prompt: "  What is 2+2?  ", mode: "ask", paths: [], platform: "win32" })).toBe(
+    expect(buildPrompt({ prompt: "  What is 2+2?  ", mode: "ask", files: [], platform: "win32" })).toBe(
       `What is 2+2?\n\n${GUARDRAIL}`,
     );
   });
@@ -47,20 +70,22 @@ describe("buildPrompt", () => {
     const prompt = buildPrompt({
       prompt: "Review this",
       mode: "review",
-      paths: ["C:\\a b\\x.ts", "C:\\y.ts"],
+      files: [{ path: "C:\\a b\\x.ts", lines: 4000 }, { path: "C:\\y.ts" }],
       platform: "win32",
     });
     const sections = prompt.split("\n\n");
     expect(sections[0]).toBe(MODE_PREFIXES.review);
     expect(sections[1]).toBe("Review this");
-    expect(sections[2]).toContain('@"C:\\a b\\x.ts"');
+    expect(sections[2]).toContain('@"C:\\a b\\x.ts" (4000 lines, only the first 2000 attached)');
     expect(sections[2]).toContain('@"C:\\y.ts"');
+    // Gemini silently attaches only the first 2000 lines of a file; it must be told.
+    expect(sections[2]).toContain(TRUNCATION_NOTICE);
     expect(sections.at(-1)).toBe(GUARDRAIL);
   });
 
   it("ends every mode with the read-only guardrail", () => {
     for (const mode of MODES) {
-      expect(buildPrompt({ prompt: "x", mode, paths: [] }).endsWith(GUARDRAIL)).toBe(true);
+      expect(buildPrompt({ prompt: "x", mode, files: [] }).endsWith(GUARDRAIL)).toBe(true);
     }
   });
 
@@ -68,7 +93,12 @@ describe("buildPrompt", () => {
     ["win32", ["C:\\Users\\Me\\My Project\\src\\big file.ts", "D:\\logs\\build,1.log", "C:\\plain\\a.txt"]],
     ["linux", ["/home/me/my project/src/big file.ts", "/var/log/build,1 (old).log", "/plain/a.txt"]],
   ] as const)("on %s the Gemini CLI extracts exactly our paths and nothing from the task text", (platform, paths) => {
-    const prompt = buildPrompt({ prompt: "Compare these. Ping me@example.com, see @Component.", mode: "analyze", paths, platform });
+    const prompt = buildPrompt({
+      prompt: "Compare these. Ping me@example.com, see @Component.",
+      mode: "analyze",
+      files: paths.map((path, i) => ({ path, lines: i === 0 ? 4000 : null })),
+      platform,
+    });
     expect(geminiExtractedPaths(prompt, platform)).toEqual(paths);
   });
 });

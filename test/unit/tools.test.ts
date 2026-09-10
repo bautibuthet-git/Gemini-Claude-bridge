@@ -73,7 +73,7 @@ describe("gemini_ask", () => {
     expect(req.cwd).toBe(path.join(root, "scratch"));
     // The file's folder is inside the project, so the project folder alone covers both.
     expect(req.includeDirectories).toEqual([project]);
-    expect(req.timeoutMs).toBe(120_000);
+    expect(req.timeoutMs).toBe(180_000);
     expect(req.yolo).toBe(false);
 
     const saved = 40_000 - "Gemini says hi".length;

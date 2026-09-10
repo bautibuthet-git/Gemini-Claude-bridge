@@ -89,7 +89,7 @@ Claude may also delegate on its own when a task clearly fits, such as a huge fil
 | `paths` | none | Up to 20 files or folders. Absolute paths are preferred; relative ones resolve against the project folder. Folders are read recursively. |
 | `mode` | `ask` | `ask` general · `analyze` explain code/architecture · `review` critical review with file/line citations · `refactor` behavior-preserving proposals · `plan` ordered implementation plan · `test` test cases plus code |
 | `model` | Gemini CLI default | Model override. |
-| `timeoutMs` | `120000` | 5 s to 30 min. When it expires, the whole Gemini process tree is killed. |
+| `timeoutMs` | `180000` | 5 s to 30 min. When it expires, the whole Gemini process tree is killed. Big files are slow: summarizing a 4000-line log took ~95 s, because Gemini reads past the attachment limit itself. |
 | `yolo` | `false` | Auto-approves Gemini's own tool calls (e.g. web fetches). Only on request. |
 
 ## How it works
@@ -101,6 +101,7 @@ Claude may also delegate on its own when a task clearly fits, such as a huge fil
    - **The prompt goes over stdin, not `-p`.** On Windows `gemini` is a `.cmd` shim run through cmd.exe, which cuts arguments at the first newline and at about 8 KB.
    - **Gemini runs from a bridge-owned empty folder** (`~/.gemini-claude-bridge/workspace`). The referenced folders and the project folder are added with `--include-directories`.
 5. Gemini's CLI reads the files and answers. The bridge returns the text plus metadata: mode, model, duration, and an estimate of the tokens kept out of Claude's context.
+   - The CLI attaches only the **first 2000 lines** of each file, silently. So the prompt states each file's real line count and requires Gemini to read the rest with its read-only tools before answering, and to say what it could not read. Without that, a summary of a 4000-line log happily reported "no errors" while the error sat on line 2817.
 6. A hard timeout (default 120 s) kills the whole process tree with `tree-kill`, so a hung or signed-out Gemini can never hang Claude.
 
 | `errorType` | Meaning / what to do |
@@ -126,7 +127,7 @@ State lives in `~/.gemini-claude-bridge/state.json` (Windows: `C:\Users\<you>\.g
 {
   "schemaVersion": 1,
   "enabled": true,
-  "preferences": { "model": null, "approvalMode": "default", "timeoutMs": 120000 },
+  "preferences": { "model": null, "approvalMode": "default", "timeoutMs": 180000 },
   "geminiCli": { "lastDetectedVersion": "0.59.0", "lastAuthOk": true, "...": "..." },
   "usage": { "totalCalls": 12, "totalErrors": 1, "callsByMode": { "review": 5, "ask": 7 }, "estimatedCharsSaved": 812345 }
 }
@@ -149,6 +150,7 @@ State lives in `~/.gemini-claude-bridge/state.json` (Windows: `C:\Users\<you>\.g
 - **`not_authenticated`.** Run `gemini` in a terminal and sign in with Google.
 - **`not_authenticated` mentioning "no longer supported for Gemini Code Assist for individuals".** Google refused that account's tier for the CLI, so signing in again won't help. Switch to an API key as described in Requirements.
 - **Rate limit or quota errors.** These come from your Gemini account's limits. Wait, or let Claude do the task itself.
+- **`Quota exceeded … limit: 0` on a pro model, with a free API key.** The CLI routes bigger tasks to a pro model that has no free-tier quota. Pin a flash model in `preferences.model` (for example `gemini-3.1-flash-lite`, which handled a 4000-line log fine), or pass `model` per call.
 - **Very large answers.** Claude Code caps MCP tool results at about 25k tokens (`MAX_MCP_OUTPUT_TOKENS`). The bridge asks Gemini to be concise; for huge jobs, split the task.
 - **`claude plugin marketplace add` fails with "Cannot prompt because user interactivity has been disabled" or "could not read Username".** Git has no credentials for the private repo. Run `gh auth setup-git`.
 - **Right after reinstalling, Claude says the MCP server "failed to connect" even though `claude mcp list` shows it connected.** Claude Code caches a failed connection for about 15 minutes and skips retrying in the meantime. Wait it out, or run `claude plugin marketplace update gemini-claude-bridge` — an update changes the server's path and invalidates the cached failure.

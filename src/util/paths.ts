@@ -143,6 +143,27 @@ async function directorySize(dir: string, budget: { files: number }): Promise<nu
   return total;
 }
 
+/** Files larger than this are not counted: the answer isn't worth reading the whole file for. */
+const MAX_LINE_COUNT_BYTES = 8 * 1024 * 1024;
+
+/**
+ * Total lines of a text file, or null when unknown (directory, binary, too large, unreadable).
+ * Told to Gemini so it can see how much of a file its attachment is missing.
+ */
+export async function countLines(file: string): Promise<number | null> {
+  try {
+    const stat = await fsp.stat(file);
+    if (!stat.isFile() || stat.size === 0 || stat.size > MAX_LINE_COUNT_BYTES) return null;
+    const buffer = await fsp.readFile(file);
+    if (buffer.includes(0)) return null; // binary
+    let lines = 0;
+    for (let i = buffer.indexOf(10); i !== -1; i = buffer.indexOf(10, i + 1)) lines++;
+    return buffer[buffer.length - 1] === 10 ? lines : lines + 1;
+  } catch {
+    return null;
+  }
+}
+
 async function fileSize(file: string): Promise<number> {
   return fsp.stat(file).then(
     (s) => s.size,

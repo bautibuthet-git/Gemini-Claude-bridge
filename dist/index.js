@@ -7934,6 +7934,20 @@ async function directorySize(dir, budget) {
   }
   return total;
 }
+var MAX_LINE_COUNT_BYTES = 8 * 1024 * 1024;
+async function countLines(file2) {
+  try {
+    const stat = await fsp.stat(file2);
+    if (!stat.isFile() || stat.size === 0 || stat.size > MAX_LINE_COUNT_BYTES) return null;
+    const buffer = await fsp.readFile(file2);
+    if (buffer.includes(0)) return null;
+    let lines = 0;
+    for (let i = buffer.indexOf(10); i !== -1; i = buffer.indexOf(10, i + 1)) lines++;
+    return buffer[buffer.length - 1] === 10 ? lines : lines + 1;
+  } catch {
+    return null;
+  }
+}
 async function fileSize(file2) {
   return fsp.stat(file2).then(
     (s) => s.size,
@@ -28007,7 +28021,7 @@ function date4(params) {
 // src/state/schema.ts
 var MODES = ["ask", "analyze", "review", "refactor", "plan", "test"];
 var SCHEMA_VERSION = 1;
-var DEFAULT_TIMEOUT_MS = 12e4;
+var DEFAULT_TIMEOUT_MS = 18e4;
 var MIN_TIMEOUT_MS = 5e3;
 var MAX_TIMEOUT_MS = 30 * 6e4;
 var CHARS_PER_TOKEN = 4;
@@ -37783,13 +37797,13 @@ function createContext(store = new StateStore()) {
 // src/gemini/promptBuilder.ts
 var MODE_PREFIXES = {
   ask: "",
-  analyze: "Analysis task. Examine the provided material and explain how it works: structure, responsibilities, data flow and notable design decisions. Be concrete and cite specific files, functions and line numbers.",
+  analyze: "Analysis task. Examine the provided material and explain what matters in it: for code, its structure, responsibilities, data flow and notable design decisions; for logs or data, what happened and what stands out. Be concrete and cite specific files, lines or timestamps.",
   review: "Critical code review. Identify bugs, edge cases, security issues, performance problems and maintainability risks. Rank findings by severity, cite specific files and lines, and suggest a fix for each. Skip praise and generic advice.",
   refactor: "Refactoring proposal. Suggest behavior-preserving improvements to structure, naming, duplication, clarity and performance. Show the proposed code and briefly justify each change. Do not apply the changes yourself.",
   plan: "Implementation planning. Produce a concise, ordered plan: the files to create or change, what changes in each, risks, and open questions.",
   test: "Test design. Propose test cases covering the happy path, edge cases and failure modes, and write the test code using the project's existing test framework and conventions where visible."
 };
-var GUARDRAIL = "Respond in plain text only (Markdown and code blocks are fine). Do not run shell commands or edit files. Be concise: your answer is read by another AI assistant with a limited context window.";
+var GUARDRAIL = "Respond in plain text only (Markdown and code blocks are fine). Use your read-only tools freely \u2014 reading files, listing and searching \u2014 but change nothing: no file edits, no writes, no shell commands. Be concise: your answer is read by another AI assistant with a limited context window.";
 function toAtReference(absolutePath, platform = process.platform) {
   if (platform === "win32") return `@"${absolutePath}"`;
   return `@${absolutePath.replace(/([ \t()[\]{};,|*?$`'"#&<>!~\\])/g, "\\$1")}`;
@@ -37797,16 +37811,25 @@ function toAtReference(absolutePath, platform = process.platform) {
 function escapeAtSigns(text) {
   return text.replace(/(?<!\\)@/g, "\\@");
 }
-function buildPrompt({ prompt, mode, paths, platform }) {
+var ATTACHED_LINE_LIMIT = 2e3;
+var TRUNCATION_NOTICE = `Only the first ${ATTACHED_LINE_LIMIT} lines of each file are attached. If a file listed above as partly attached matters for this task, you MUST read its remaining lines yourself before answering \u2014 your read-only file tools can read any line range, and reading is allowed. Never conclude anything (such as "no errors") from the attached excerpt alone, and state plainly which parts you could not read.`;
+function fileReferenceLine(file2, platform = process.platform) {
+  const reference = toAtReference(file2.path, platform);
+  if (file2.lines == null) return reference;
+  return file2.lines > ATTACHED_LINE_LIMIT ? `${reference} (${file2.lines} lines, only the first ${ATTACHED_LINE_LIMIT} attached)` : `${reference} (${file2.lines} lines)`;
+}
+function buildPrompt({ prompt, mode, files, platform }) {
   const sections = [];
   const prefix = MODE_PREFIXES[mode];
   if (prefix) sections.push(prefix);
   sections.push(escapeAtSigns(prompt.trim()));
-  if (paths.length > 0) {
+  if (files.length > 0) {
     sections.push(
-      ["Referenced files and folders (their contents are attached):", ...paths.map((p) => toAtReference(p, platform))].join(
-        "\n"
-      )
+      [
+        "Referenced files and folders (their contents are attached):",
+        ...files.map((file2) => fileReferenceLine(file2, platform)),
+        TRUNCATION_NOTICE
+      ].join("\n")
     );
   }
   sections.push(GUARDRAIL);
@@ -37849,7 +37872,7 @@ var askInputSchema = {
     "Framing preset. ask (default): general. analyze: explain code or architecture. review: critical code review citing files and lines. refactor: behavior-preserving improvement proposals. plan: ordered implementation plan. test: test cases plus test code."
   ),
   model: external_exports.string().regex(MODEL_PATTERN, "Model names contain only letters, digits and . _ : / -").optional().describe("Gemini model override. Omit to use the Gemini CLI's default (recommended)."),
-  timeoutMs: external_exports.number().int().min(MIN_TIMEOUT_MS).max(MAX_TIMEOUT_MS).optional().describe("Hard timeout in milliseconds (default 120000). When it expires the whole Gemini process tree is killed."),
+  timeoutMs: external_exports.number().int().min(MIN_TIMEOUT_MS).max(MAX_TIMEOUT_MS).optional().describe("Hard timeout in milliseconds (default 180000). When it expires the whole Gemini process tree is killed."),
   yolo: external_exports.boolean().optional().describe(
     "Auto-approve Gemini's own tool calls (e.g. web fetches). Default false. Gemini is still told not to edit files or run commands. Only set this if the user asks."
   )
@@ -37867,9 +37890,18 @@ async function handleAsk(ctx, args, signal) {
     if (missing.length > 0) {
       throw new BridgeError("invalid_paths", `These paths do not exist: ${missing.join("; ")}`, { missing });
     }
-    const [fileChars, cwd] = await Promise.all([estimateChars(resolved), ctx.scratchDir()]);
+    const [fileChars, cwd, files] = await Promise.all([
+      estimateChars(resolved),
+      ctx.scratchDir(),
+      Promise.all(
+        resolved.map(async (p) => ({
+          path: p.absolute,
+          lines: p.isDirectory ? null : await countLines(p.absolute)
+        }))
+      )
+    ]);
     const response = await ctx.invoke({
-      prompt: buildPrompt({ prompt: args.prompt, mode, paths: resolved.map((p) => p.absolute) }),
+      prompt: buildPrompt({ prompt: args.prompt, mode, files }),
       model: args.model ?? state.preferences.model ?? void 0,
       yolo: args.yolo ?? state.preferences.approvalMode === "yolo",
       timeoutMs: args.timeoutMs ?? state.preferences.timeoutMs,

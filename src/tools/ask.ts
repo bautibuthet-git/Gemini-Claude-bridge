@@ -12,7 +12,7 @@ import {
   type Mode,
 } from "../state/schema.js";
 import { BridgeError } from "../util/errors.js";
-import { estimateChars, includeDirectoriesFor, resolveInputPaths } from "../util/paths.js";
+import { countLines, estimateChars, includeDirectoriesFor, resolveInputPaths } from "../util/paths.js";
 import { errorResult, textResult, toBridgeError, withWarning } from "./result.js";
 
 export const MAX_PATHS = 20;
@@ -55,7 +55,7 @@ export const askInputSchema = {
     .min(MIN_TIMEOUT_MS)
     .max(MAX_TIMEOUT_MS)
     .optional()
-    .describe("Hard timeout in milliseconds (default 120000). When it expires the whole Gemini process tree is killed."),
+    .describe("Hard timeout in milliseconds (default 180000). When it expires the whole Gemini process tree is killed."),
   yolo: z
     .boolean()
     .optional()
@@ -89,9 +89,18 @@ export async function handleAsk(ctx: BridgeContext, args: AskArgs, signal?: Abor
       throw new BridgeError("invalid_paths", `These paths do not exist: ${missing.join("; ")}`, { missing });
     }
 
-    const [fileChars, cwd] = await Promise.all([estimateChars(resolved), ctx.scratchDir()]);
+    const [fileChars, cwd, files] = await Promise.all([
+      estimateChars(resolved),
+      ctx.scratchDir(),
+      Promise.all(
+        resolved.map(async (p) => ({
+          path: p.absolute,
+          lines: p.isDirectory ? null : await countLines(p.absolute),
+        })),
+      ),
+    ]);
     const response = await ctx.invoke({
-      prompt: buildPrompt({ prompt: args.prompt, mode, paths: resolved.map((p) => p.absolute) }),
+      prompt: buildPrompt({ prompt: args.prompt, mode, files }),
       model: args.model ?? state.preferences.model ?? undefined,
       yolo: args.yolo ?? state.preferences.approvalMode === "yolo",
       timeoutMs: args.timeoutMs ?? state.preferences.timeoutMs,
