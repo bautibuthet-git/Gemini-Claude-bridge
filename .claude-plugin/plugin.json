@@ -5,7 +5,7 @@
   "author": {
     "name": "bautibuthet-git"
   },
-  "repository": "https://github.com/bautibuthet-git/gemini-claude-bridge",
+  "repository": "https://github.com/bautibuthet-git/Gemini-Claude-bridge",
   "license": "MIT",
   "keywords": ["gemini", "mcp", "delegation", "context", "tokens"],
   "mcpServers": "./mcp-servers.json"

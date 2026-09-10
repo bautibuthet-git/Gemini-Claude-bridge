@@ -45,7 +45,7 @@ The three tools are always registered. When the bridge is off, `gemini_ask` refu
 ## Install
 
 ```bash
-claude plugin marketplace add https://github.com/bautibuthet-git/gemini-claude-bridge.git
+claude plugin marketplace add https://github.com/bautibuthet-git/Gemini-Claude-bridge.git
 claude plugin install gemini-claude-bridge@gemini-claude-bridge
 ```
 
@@ -159,8 +159,8 @@ State lives in `~/.gemini-claude-bridge/state.json` (Windows: `C:\Users\<you>\.g
 ## Development
 
 ```bash
-git clone https://github.com/bautibuthet-git/gemini-claude-bridge.git
-cd gemini-claude-bridge
+git clone https://github.com/bautibuthet-git/Gemini-Claude-bridge.git
+cd Gemini-Claude-bridge
 npm install
 npm run check
 ```
