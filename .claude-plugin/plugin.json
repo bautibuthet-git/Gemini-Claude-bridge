@@ -1,0 +1,12 @@
+{
+  "name": "gemini-claude-bridge",
+  "displayName": "Gemini ↔ Claude Bridge",
+  "description": "Let Claude delegate big-file reads, broad analysis, reviews and boilerplate to Google Gemini through your local gemini CLI, with an on/off switch you flip just by asking Claude.",
+  "author": {
+    "name": "bautibuthet-git"
+  },
+  "repository": "https://github.com/bautibuthet-git/gemini-claude-bridge",
+  "license": "MIT",
+  "keywords": ["gemini", "mcp", "delegation", "context", "tokens"],
+  "mcpServers": "./.mcp.json"
+}

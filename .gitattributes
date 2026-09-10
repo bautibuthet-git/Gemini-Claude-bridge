@@ -1,0 +1,5 @@
+* text=auto eol=lf
+
+# Pre-built bundle: committed on purpose (plugin install has no build step), but it is
+# generated from src/, so keep it out of diffs and mark it as generated on GitHub.
+dist/** linguist-generated=true -diff

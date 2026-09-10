@@ -1,0 +1,33 @@
+{
+  "name": "gemini-claude-bridge",
+  "version": "0.1.0",
+  "description": "Claude Code plugin that lets Claude delegate big reads, research, reviews and drafting to Google Gemini through the gemini CLI.",
+  "private": true,
+  "type": "module",
+  "license": "MIT",
+  "engines": {
+    "node": ">=20"
+  },
+  "scripts": {
+    "build": "node scripts/build.mjs",
+    "typecheck": "tsc --noEmit",
+    "test": "vitest run",
+    "test:watch": "vitest",
+    "smoke": "node scripts/smoke.mjs",
+    "check": "npm run typecheck && npm test && npm run build && npm run smoke",
+    "postinstall": "node scripts/check-gemini-cli.mjs"
+  },
+  "dependencies": {
+    "@modelcontextprotocol/sdk": "1.30.0",
+    "cross-spawn": "7.0.6",
+    "tree-kill": "1.2.2",
+    "zod": "4.6.1"
+  },
+  "devDependencies": {
+    "@types/cross-spawn": "6.0.6",
+    "@types/node": "22.20.2",
+    "esbuild": "0.28.2",
+    "typescript": "7.0.2",
+    "vitest": "5.0.0"
+  }
+}

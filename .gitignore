@@ -1,0 +1,15 @@
+node_modules/
+coverage/
+*.log
+*.tsbuildinfo
+.DS_Store
+Thumbs.db
+
+# NOTE: dist/ is intentionally committed. Plugin install is a git clone with no
+# build step, so the pre-built, dependency-free dist/index.js must be in the repo.
+
+# The lockfile is intentionally NOT committed: when a plugin ships package.json plus a
+# lockfile, Claude Code runs `npm ci` into every user's plugin cache on install. dist/ needs
+# no node_modules, so that would only download dev tooling. Versions are pinned exactly in
+# package.json instead.
+package-lock.json

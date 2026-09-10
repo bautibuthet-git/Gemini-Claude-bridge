@@ -1,0 +1,15 @@
+{
+  "name": "gemini-claude-bridge",
+  "owner": {
+    "name": "bautibuthet-git"
+  },
+  "description": "Private marketplace for the Gemini ↔ Claude Bridge plugin (marketplace and plugin live in the same repo).",
+  "plugins": [
+    {
+      "name": "gemini-claude-bridge",
+      "source": "./",
+      "description": "Delegate big-file reads, broad analysis, reviews and boilerplate from Claude to Google Gemini via the gemini CLI.",
+      "category": "productivity"
+    }
+  ]
+}
