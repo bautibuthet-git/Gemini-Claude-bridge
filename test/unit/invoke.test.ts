@@ -4,6 +4,7 @@ import {
   invokeGemini,
   parseGeminiJson,
   runProcess,
+  summarizeOutput,
   type GeminiRequest,
 } from "../../src/gemini/invoke.js";
 import { BridgeError, type BridgeErrorType } from "../../src/util/errors.js";
@@ -98,6 +99,26 @@ describe("invokeGemini", () => {
     expect(err.details).toMatchObject({ exitCode: code });
   });
 
+  it("maps Google's ineligible-tier refusal to a sign-in problem with a usable next step", async () => {
+    // Verbatim shape of what Gemini CLI 0.59 printed on stderr for this account (stdout was empty).
+    const stderr = [
+      "Warning: True color (24-bit) support not detected. Using a terminal with true color enabled will result in a better visual experience.",
+      "Error authenticating: IneligibleTierError: This client is no longer supported for Gemini Code Assist for individuals. To continue using Gemini, please migrate to the Antigravity suite of products: https://antigravity.google",
+      "    at throwIneligibleOrProjectIdError (file:///C:/Users/Me/AppData/Roaming/npm/node_modules/@google/gemini-cli/bundle/chunk.js:310176:11)",
+      "    at _doSetupUser (file:///C:/Users/Me/AppData/Roaming/npm/node_modules/@google/gemini-cli/bundle/chunk.js:310165:5)",
+      "Ripgrep is not available. Falling back to GrepTool.",
+      "An unexpected critical error occurred:IneligibleTierError: This client is no longer supported for Gemini Code Assist for individuals.",
+      "    at throwIneligibleOrProjectIdError (file:///C:/Users/Me/AppData/Roaming/npm/node_modules/@google/gemini-cli/bundle/chunk.js:310176:11)",
+    ].join("\n");
+    const { spawn } = fakeSpawn((child) => child.exit(1, "", stderr));
+    const err = await expectBridgeError(invokeGemini(REQ, { spawn }), "not_authenticated");
+
+    expect(err.message).toMatch(/no longer supported for Gemini Code Assist/);
+    expect(err.message).not.toMatch(/ {4}at /);
+    expect(err.message).not.toMatch(/True color/);
+    expect(err.details.nextStep).toMatch(/aistudio\.google\.com/);
+  });
+
   it("reports an error document even when the exit code is 0", async () => {
     const { spawn } = fakeSpawn((child) => child.exit(0, doc({ error: { type: "Error", message: "model overloaded" } })));
     await expectBridgeError(invokeGemini(REQ, { spawn }), "gemini_error");
@@ -151,11 +172,29 @@ describe("invokeGemini", () => {
 });
 
 describe("parseGeminiJson", () => {
-  it("parses a plain document, skips leading noise, and rejects garbage", () => {
+  it("parses a plain document, ignores surrounding log lines, and rejects garbage", () => {
     expect(parseGeminiJson(doc({ response: "a" }))).toEqual({ response: "a" });
-    expect(parseGeminiJson(`warn: x\n{\n  "response": "b"\n}`)).toEqual({ response: "b" });
+    expect(parseGeminiJson(`warn: x\n${doc({ response: "b" })}`)).toEqual({ response: "b" });
+    expect(parseGeminiJson(`${doc({ response: "c" })}\nRipgrep is not available.`)).toEqual({ response: "c" });
+    expect(parseGeminiJson(`start\n${doc({ response: "d" })}\nend`)).toEqual({ response: "d" });
     expect(parseGeminiJson("not json at all")).toBeNull();
     expect(parseGeminiJson("")).toBeNull();
     expect(parseGeminiJson("[1,2]")).toBeNull();
+  });
+});
+
+describe("summarizeOutput", () => {
+  it("keeps the last meaningful line and drops stack frames and terminal chatter", () => {
+    const text = "Warning: True color (24-bit) support not detected.\nError authenticating: boom\n    at foo (x.js:1:1)";
+    expect(summarizeOutput(text)).toBe("Error authenticating: boom");
+  });
+
+  it("falls back to the last lines when nothing looks like an error", () => {
+    expect(summarizeOutput("one\ntwo\nthree\nfour")).toBe("two\nthree\nfour");
+    expect(summarizeOutput("   \n  ")).toBe("");
+  });
+
+  it("truncates very long messages", () => {
+    expect(summarizeOutput(`Error: ${"x".repeat(900)}`, 100)).toHaveLength(101);
   });
 });

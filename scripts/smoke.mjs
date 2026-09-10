@@ -103,7 +103,9 @@ try {
   check(Boolean(call?.args.includes("--skip-trust") && call.args.includes("json")), "headless JSON args");
   check(Boolean(call?.args.includes(`--include-directories=${project}`)), "project folder readable, path with spaces intact");
   check(path.resolve(call?.cwd ?? "") === path.resolve(bridgeHome, "workspace"), "Gemini ran from the bridge's scratch folder");
-  check((r.structuredContent?.estimatedCharsSaved ?? 0) > 0, `estimated chars saved: ${r.structuredContent?.estimatedCharsSaved}`);
+  const saved = /~(\d+) tokens of file content kept out/.exec(textOf(r));
+  check(Boolean(saved), `footer reports the context saved: ~${saved?.[1]} tokens`);
+  check(r.structuredContent === undefined, "a successful answer carries no structuredContent (Claude Code would show that instead of the text)");
 
   r = await client.callTool({ name: "gemini_bridge_status", arguments: { forceRefresh: true } });
   check(/Gemini bridge: ON/.test(textOf(r)) && /v0\.0\.0-fake/.test(textOf(r)), "status: ON, CLI version detected through the .cmd shim");

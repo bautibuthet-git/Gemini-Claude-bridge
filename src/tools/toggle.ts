@@ -25,10 +25,8 @@ export async function handleToggle(ctx: BridgeContext, args: { enabled: boolean 
     : changed
       ? "The Gemini bridge is now OFF: gemini_ask refuses immediately without contacting Gemini, so handle tasks yourself until it is turned back on."
       : "The Gemini bridge was already OFF.";
-  return withWarning(
-    textResult(`${text} (Global setting: applies to every project and session.)`, { enabled: args.enabled, changed }),
-    ctx.store.takeWarning(),
-  );
+  const message = `${text} (Global setting: applies to every project and session.)`;
+  return withWarning(textResult(message, { message, enabled: args.enabled, changed }), ctx.store.takeWarning());
 }
 
 export function registerToggleTool(server: McpServer, ctx: BridgeContext): void {

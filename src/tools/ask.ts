@@ -117,19 +117,10 @@ export async function handleAsk(ctx: BridgeContext, args: AskArgs, signal?: Abor
     const footer =
       `\n\n[gemini-claude-bridge · ${mode} · ${response.model ?? "default model"} · ${(response.durationMs / 1000).toFixed(1)}s` +
       (tokensSaved > 0 ? ` · ~${tokensSaved} tokens of file content kept out of Claude's context]` : "]");
-    return withWarning(
-      textResult(response.text + cliWarnings + footer, {
-        ok: true,
-        mode,
-        model: response.model,
-        durationMs: response.durationMs,
-        exitCode: response.exitCode,
-        filesAttached: resolved.length,
-        estimatedCharsSaved: charsSaved,
-        estimatedTokensSaved: tokensSaved,
-      }),
-      warning,
-    );
+    // Deliberately no structuredContent: Claude Code would show the model that payload instead
+    // of these text blocks, and Gemini's answer must reach Claude as readable text. The footer
+    // carries the metadata a structured payload would have held.
+    return withWarning(textResult(response.text + cliWarnings + footer), warning);
   } catch (err) {
     const error = toBridgeError(err);
     await ctx.store

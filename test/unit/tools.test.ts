@@ -76,10 +76,13 @@ describe("gemini_ask", () => {
     expect(req.timeoutMs).toBe(120_000);
     expect(req.yolo).toBe(false);
 
-    expect(textOf(result)).toMatch(/^Gemini says hi/);
-    expect(textOf(result)).toMatch(/gemini-claude-bridge · analyze · main-pro/);
     const saved = 40_000 - "Gemini says hi".length;
-    expect(result.structuredContent).toMatchObject({ ok: true, mode: "analyze", filesAttached: 1, estimatedCharsSaved: saved });
+    expect(textOf(result)).toBe(
+      `Gemini says hi\n\n[gemini-claude-bridge · analyze · main-pro · 1.2s · ~${Math.round(saved / 4)} tokens of file content kept out of Claude's context]`,
+    );
+    // Claude Code shows the model structuredContent INSTEAD of the text, so a successful answer
+    // must not carry one, or Gemini's answer would never reach Claude.
+    expect(result.structuredContent).toBeUndefined();
 
     const state = await ctx.store.read();
     expect(state.usage).toMatchObject({ totalCalls: 1, totalErrors: 0, callsByMode: { analyze: 1 }, estimatedCharsSaved: saved });
@@ -96,7 +99,12 @@ describe("gemini_ask", () => {
     const result = await handleAsk(ctx, { prompt: "x", paths: ["does/not/matter"] });
 
     expect(result.isError).toBe(true);
-    expect(result.structuredContent).toMatchObject({ ok: false, errorType: "disabled" });
+    // Both representations carry the next step, whichever one the client shows the model.
+    expect(result.structuredContent).toMatchObject({
+      ok: false,
+      errorType: "disabled",
+      nextStep: expect.stringContaining("Do the task yourself"),
+    });
     expect(textOf(result)).toMatch(/Do the task yourself/);
     expect(invoke).not.toHaveBeenCalled();
     expect((await ctx.store.read()).usage.totalCalls).toBe(0);
@@ -162,7 +170,11 @@ describe("gemini_bridge_status", () => {
     expect(text).toMatch(/Gemini CLI: installed v0\.59\.0/);
     expect(text).toMatch(/Sign-in: OK/);
     expect(text).toMatch(/1 call, 0 errors \(review 1\)/);
-    expect(result.structuredContent).toMatchObject({ enabled: true, usage: { totalCalls: 1 } });
+    expect(result.structuredContent).toMatchObject({
+      enabled: true,
+      usage: { totalCalls: 1 },
+      summary: expect.stringContaining("Gemini bridge: ON"),
+    });
   });
 
   it("works while the bridge is off", async () => {

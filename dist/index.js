@@ -3806,8 +3806,8 @@ var require_utils = __commonJS({
       }
       if (bestLength < 2) return hextets.join(":");
       const head = hextets.slice(0, bestStart).join(":");
-      const tail2 = hextets.slice(bestStart + bestLength).join(":");
-      return head + "::" + tail2;
+      const tail = hextets.slice(bestStart + bestLength).join(":");
+      return head + "::" + tail;
     }
     function normalizeIPv6Address(input2) {
       const compression = input2.indexOf("::");
@@ -8095,6 +8095,14 @@ var EXIT_UNTRUSTED = 55;
 var EXIT_NOT_FOUND = /* @__PURE__ */ new Set([9009, 127]);
 var AUTH_PATTERN = /(authenticat|auth method|not logged in|\blog ?in\b|\bsign ?in\b|credential|oauth|api key|unauthenticated|invalid_grant|\b401\b)/i;
 var QUOTA_PATTERN = /(quota|rate.?limit|resource_exhausted|\b429\b|too many requests)/i;
+var INELIGIBLE_PATTERN = /(ineligibletier|unsupported_client|no longer supported for gemini code assist|antigravity)/i;
+var NOISE_PATTERNS = [
+  /^\s+at\s/,
+  // stack frames
+  /^Warning: True color/i,
+  /^Ripgrep is not available/i,
+  /^Loaded cached credentials/i
+];
 function interpretResult(r, timeoutMs) {
   if (r.timedOut) {
     throw new BridgeError(
@@ -8116,13 +8124,19 @@ function interpretResult(r, timeoutMs) {
     const warnings = Array.isArray(json2?.warnings) ? json2.warnings.filter((w) => typeof w === "string") : [];
     return { text, model: primaryModel(json2?.stats), durationMs: r.durationMs, exitCode, warnings };
   }
-  const message = json2?.error?.message?.trim() || tail(r.stderr) || tail(r.stdout) || "no error output";
+  const message = json2?.error?.message?.trim() || summarizeOutput(r.stderr) || summarizeOutput(r.stdout) || "no error output";
   throw classifyFailure(exitCode, message, json2?.error?.type);
 }
 function classifyFailure(exitCode, message, geminiErrorType) {
   const details = { exitCode, ...geminiErrorType ? { geminiErrorType } : {} };
   if (EXIT_NOT_FOUND.has(exitCode)) {
     return new BridgeError("not_installed", `The Gemini CLI could not be started: ${message}`, details);
+  }
+  if (INELIGIBLE_PATTERN.test(message)) {
+    return new BridgeError("not_authenticated", `Google rejected this Gemini CLI for that account: ${message}`, {
+      ...details,
+      nextStep: 'Google refused this Gemini CLI for the signed-in account\'s tier. Tell the user to switch the Gemini CLI to another auth method: create an API key at https://aistudio.google.com/apikey, put GEMINI_API_KEY=<key> in ~/.gemini/.env, and select "Gemini API key" via /auth inside `gemini`. Meanwhile, do the task yourself.'
+    });
   }
   if (exitCode === EXIT_AUTH || AUTH_PATTERN.test(message)) {
     return new BridgeError("not_authenticated", `The Gemini CLI is not signed in: ${message}`, details);
@@ -8139,10 +8153,13 @@ function parseGeminiJson(text) {
   const parsed = tryParseObject(trimmed);
   if (parsed) return parsed;
   const lines = trimmed.split(/\r?\n/);
-  for (let i = lines.length - 1; i >= 0; i--) {
-    if (!lines[i]?.startsWith("{")) continue;
-    const candidate = tryParseObject(lines.slice(i).join("\n"));
-    if (candidate) return candidate;
+  for (let start = 0; start < lines.length; start++) {
+    if (!lines[start]?.startsWith("{")) continue;
+    for (let end = lines.length - 1; end > start; end--) {
+      if (lines[end]?.trim() !== "}") continue;
+      const candidate = tryParseObject(lines.slice(start, end + 1).join("\n"));
+      if (candidate) return candidate;
+    }
   }
   return null;
 }
@@ -8166,8 +8183,13 @@ function primaryModel(stats) {
   }
   return best;
 }
-function tail(text, maxLines = 6) {
-  return text.trim().split(/\r?\n/).slice(-maxLines).join("\n").trim();
+function summarizeOutput(text, maxChars = 500) {
+  const lines = text.split(/\r?\n/).map((line) => line.trimEnd()).filter((line) => line.trim() !== "" && !NOISE_PATTERNS.some((pattern) => pattern.test(line)));
+  if (lines.length === 0) return "";
+  const meaningful = lines.filter((line) => /(error|failed|cannot|unable|denied|quota|limit|not recognized)/i.test(line));
+  const chosen = meaningful.length > 0 ? [meaningful[meaningful.length - 1]] : lines.slice(-3);
+  const summary = chosen.join("\n").trim();
+  return summary.length > maxChars ? `${summary.slice(0, maxChars)}\u2026` : summary;
 }
 
 // src/gemini/detect.ts
@@ -37798,11 +37820,12 @@ function textResult(text, structuredContent) {
   return result;
 }
 function errorResult(type, message, details = {}) {
+  const nextStep = typeof details.nextStep === "string" ? details.nextStep : ERROR_HINTS[type];
   return {
     isError: true,
     content: [{ type: "text", text: `Gemini bridge error (${type}): ${message}
-Next step: ${ERROR_HINTS[type]}` }],
-    structuredContent: { ok: false, errorType: type, message, ...details }
+Next step: ${nextStep}` }],
+    structuredContent: { ok: false, errorType: type, message, nextStep, ...details }
   };
 }
 function toBridgeError(err) {
@@ -37870,19 +37893,7 @@ ${response.warnings.join("\n")}` : "";
     const footer = `
 
 [gemini-claude-bridge \xB7 ${mode} \xB7 ${response.model ?? "default model"} \xB7 ${(response.durationMs / 1e3).toFixed(1)}s` + (tokensSaved > 0 ? ` \xB7 ~${tokensSaved} tokens of file content kept out of Claude's context]` : "]");
-    return withWarning(
-      textResult(response.text + cliWarnings + footer, {
-        ok: true,
-        mode,
-        model: response.model,
-        durationMs: response.durationMs,
-        exitCode: response.exitCode,
-        filesAttached: resolved.length,
-        estimatedCharsSaved: charsSaved,
-        estimatedTokensSaved: tokensSaved
-      }),
-      warning
-    );
+    return withWarning(textResult(response.text + cliWarnings + footer), warning);
   } catch (err) {
     const error62 = toBridgeError(err);
     await ctx.store.update((s) => {
@@ -37931,8 +37942,10 @@ async function handleStatus(ctx, args) {
   const cli = await ctx.refreshCli(args.forceRefresh ?? false);
   const state = await ctx.store.read();
   const usage = { ...state.usage, estimatedTokensSaved: Math.round(state.usage.estimatedCharsSaved / CHARS_PER_TOKEN) };
+  const summary = formatStatus(state, cli, ctx.store.file);
   return withWarning(
-    textResult(formatStatus(state, cli, ctx.store.file), {
+    textResult(summary, {
+      summary,
       enabled: state.enabled,
       geminiCli: cli,
       usage,
@@ -37996,10 +38009,8 @@ async function handleToggle(ctx, args) {
   });
   const changed = before.enabled !== args.enabled;
   const text = args.enabled ? changed ? "The Gemini bridge is now ON: gemini_ask delegates to Gemini again." : "The Gemini bridge was already ON." : changed ? "The Gemini bridge is now OFF: gemini_ask refuses immediately without contacting Gemini, so handle tasks yourself until it is turned back on." : "The Gemini bridge was already OFF.";
-  return withWarning(
-    textResult(`${text} (Global setting: applies to every project and session.)`, { enabled: args.enabled, changed }),
-    ctx.store.takeWarning()
-  );
+  const message = `${text} (Global setting: applies to every project and session.)`;
+  return withWarning(textResult(message, { message, enabled: args.enabled, changed }), ctx.store.takeWarning());
 }
 function registerToggleTool(server, ctx) {
   server.registerTool(

@@ -221,6 +221,17 @@ const EXIT_NOT_FOUND = new Set([9009, 127]);
 const AUTH_PATTERN =
   /(authenticat|auth method|not logged in|\blog ?in\b|\bsign ?in\b|credential|oauth|api key|unauthenticated|invalid_grant|\b401\b)/i;
 const QUOTA_PATTERN = /(quota|rate.?limit|resource_exhausted|\b429\b|too many requests)/i;
+/** Google refusing the account's plan, e.g. IneligibleTierError telling users to move to Antigravity. */
+const INELIGIBLE_PATTERN =
+  /(ineligibletier|unsupported_client|no longer supported for gemini code assist|antigravity)/i;
+
+/** Terminal chatter the CLI prints around real errors. */
+const NOISE_PATTERNS = [
+  /^\s+at\s/, // stack frames
+  /^Warning: True color/i,
+  /^Ripgrep is not available/i,
+  /^Loaded cached credentials/i,
+];
 
 export function interpretResult(r: RunResult, timeoutMs: number): GeminiResponse {
   if (r.timedOut) {
@@ -246,7 +257,8 @@ export function interpretResult(r: RunResult, timeoutMs: number): GeminiResponse
     return { text, model: primaryModel(json?.stats), durationMs: r.durationMs, exitCode, warnings };
   }
 
-  const message = json?.error?.message?.trim() || tail(r.stderr) || tail(r.stdout) || "no error output";
+  const message =
+    json?.error?.message?.trim() || summarizeOutput(r.stderr) || summarizeOutput(r.stdout) || "no error output";
   throw classifyFailure(exitCode, message, json?.error?.type);
 }
 
@@ -254,6 +266,14 @@ export function classifyFailure(exitCode: number, message: string, geminiErrorTy
   const details = { exitCode, ...(geminiErrorType ? { geminiErrorType } : {}) };
   if (EXIT_NOT_FOUND.has(exitCode)) {
     return new BridgeError("not_installed", `The Gemini CLI could not be started: ${message}`, details);
+  }
+  // Google refusing the account's tier looks like a crash, but the fix is an auth change.
+  if (INELIGIBLE_PATTERN.test(message)) {
+    return new BridgeError("not_authenticated", `Google rejected this Gemini CLI for that account: ${message}`, {
+      ...details,
+      nextStep:
+        "Google refused this Gemini CLI for the signed-in account's tier. Tell the user to switch the Gemini CLI to another auth method: create an API key at https://aistudio.google.com/apikey, put GEMINI_API_KEY=<key> in ~/.gemini/.env, and select \"Gemini API key\" via /auth inside `gemini`. Meanwhile, do the task yourself.",
+    });
   }
   if (exitCode === EXIT_AUTH || AUTH_PATTERN.test(message)) {
     return new BridgeError("not_authenticated", `The Gemini CLI is not signed in: ${message}`, details);
@@ -282,11 +302,16 @@ export function parseGeminiJson(text: string): GeminiJson | null {
   const parsed = tryParseObject(trimmed);
   if (parsed) return parsed;
 
+  // The document is pretty-printed, so it starts with "{" at the start of a line and ends with a
+  // lone "}". Both can be surrounded by log lines, so look for a slice that actually parses.
   const lines = trimmed.split(/\r?\n/);
-  for (let i = lines.length - 1; i >= 0; i--) {
-    if (!lines[i]?.startsWith("{")) continue;
-    const candidate = tryParseObject(lines.slice(i).join("\n"));
-    if (candidate) return candidate;
+  for (let start = 0; start < lines.length; start++) {
+    if (!lines[start]?.startsWith("{")) continue;
+    for (let end = lines.length - 1; end > start; end--) {
+      if (lines[end]?.trim() !== "}") continue;
+      const candidate = tryParseObject(lines.slice(start, end + 1).join("\n"));
+      if (candidate) return candidate;
+    }
   }
   return null;
 }
@@ -314,6 +339,20 @@ function primaryModel(stats: GeminiJson["stats"]): string | null {
   return best;
 }
 
-function tail(text: string, maxLines = 6): string {
-  return text.trim().split(/\r?\n/).slice(-maxLines).join("\n").trim();
+/**
+ * Condenses raw CLI output into one meaningful error line. A fatal Gemini error prints no JSON
+ * at all — just prose, an object dump and two stack traces — so the useful sentence has to be
+ * picked out of the noise.
+ */
+export function summarizeOutput(text: string, maxChars = 500): string {
+  const lines = text
+    .split(/\r?\n/)
+    .map((line) => line.trimEnd())
+    .filter((line) => line.trim() !== "" && !NOISE_PATTERNS.some((pattern) => pattern.test(line)));
+  if (lines.length === 0) return "";
+
+  const meaningful = lines.filter((line) => /(error|failed|cannot|unable|denied|quota|limit|not recognized)/i.test(line));
+  const chosen = meaningful.length > 0 ? [meaningful[meaningful.length - 1]!] : lines.slice(-3);
+  const summary = chosen.join("\n").trim();
+  return summary.length > maxChars ? `${summary.slice(0, maxChars)}…` : summary;
 }

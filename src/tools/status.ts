@@ -20,8 +20,10 @@ export async function handleStatus(ctx: BridgeContext, args: { forceRefresh?: bo
   const cli = await ctx.refreshCli(args.forceRefresh ?? false);
   const state = await ctx.store.read();
   const usage = { ...state.usage, estimatedTokensSaved: Math.round(state.usage.estimatedCharsSaved / CHARS_PER_TOKEN) };
+  const summary = formatStatus(state, cli, ctx.store.file);
   return withWarning(
-    textResult(formatStatus(state, cli, ctx.store.file), {
+    textResult(summary, {
+      summary,
       enabled: state.enabled,
       geminiCli: cli,
       usage,
