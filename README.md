@@ -33,7 +33,12 @@ The three tools are always registered. When the bridge is off, `gemini_ask` refu
    gemini
    ```
    In `gemini`, choose **Sign in with Google**, finish in the browser, then type `/quit`.
-4. **Access to this private repo**: the owner adds you as a collaborator on GitHub. You also need git credentials for GitHub. The easiest way is the GitHub CLI: run `gh auth login` and answer **Yes** to "Authenticate Git with your GitHub credentials".
+4. **Access to this private repo**: the owner adds you as a collaborator on GitHub, and git needs credentials for GitHub so Claude Code can clone it. With the GitHub CLI:
+   ```bash
+   gh auth login
+   gh auth setup-git
+   ```
+   `gh auth setup-git` is the part that matters: without it, `claude plugin marketplace add` fails with `could not read Username for 'https://github.com'`.
 
 ## Install
 
@@ -45,6 +50,7 @@ claude plugin install gemini-claude-bridge@gemini-claude-bridge
 Then fully restart Claude Code and ask Claude: **"check the gemini bridge status"**.
 
 - The HTTPS URL is used on purpose. The `owner/repo` shorthand defaults to SSH, which only works if you have SSH keys set up with GitHub.
+- `claude plugin list` shows the version as a commit SHA. That's intended: installs track the latest commit.
 - On Windows, restart Claude Code after installing Node or the Gemini CLI; it picks up `PATH` only at launch. In the desktop app, quit it from the tray.
 - The plugin installs at user scope, so it works in every project.
 
@@ -136,6 +142,7 @@ State lives in `~/.gemini-claude-bridge/state.json` (Windows: `C:\Users\<you>\.g
 - **`not_authenticated`.** Run `gemini` in a terminal and sign in with Google.
 - **Rate limit or quota errors.** These come from your Gemini account's limits. Wait, or let Claude do the task itself.
 - **Very large answers.** Claude Code caps MCP tool results at about 25k tokens (`MAX_MCP_OUTPUT_TOKENS`). The bridge asks Gemini to be concise; for huge jobs, split the task.
+- **`claude plugin marketplace add` fails with "Cannot prompt because user interactivity has been disabled" or "could not read Username".** Git has no credentials for the private repo. Run `gh auth setup-git`.
 - **Updating.** Run `claude plugin marketplace update gemini-claude-bridge`, then restart Claude Code.
 
 ## Development
