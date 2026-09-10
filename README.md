@@ -33,6 +33,8 @@ The three tools are always registered. When the bridge is off, `gemini_ask` refu
    gemini
    ```
    In `gemini`, choose **Sign in with Google**, finish in the browser, then type `/quit`.
+
+   If Gemini later fails with `IneligibleTierError` ("no longer supported for Gemini Code Assist for individuals"), that account can't use the free tier through this CLI. Use an API key instead: create one at https://aistudio.google.com/apikey, put `GEMINI_API_KEY=<your key>` in `~/.gemini/.env` (Windows: `C:\Users\<you>\.gemini\.env`), and pick **Gemini API key** via `/auth` inside `gemini`. The bridge itself never handles the key; only the Gemini CLI reads it.
 4. **Access to this private repo**: the owner adds you as a collaborator on GitHub, and git needs credentials for GitHub so Claude Code can clone it. With the GitHub CLI:
    ```bash
    gh auth login
@@ -145,6 +147,7 @@ State lives in `~/.gemini-claude-bridge/state.json` (Windows: `C:\Users\<you>\.g
   ```
   Note that one such failure is cached for all sessions (terminal included) for about 15 minutes.
 - **`not_authenticated`.** Run `gemini` in a terminal and sign in with Google.
+- **`not_authenticated` mentioning "no longer supported for Gemini Code Assist for individuals".** Google refused that account's tier for the CLI, so signing in again won't help. Switch to an API key as described in Requirements.
 - **Rate limit or quota errors.** These come from your Gemini account's limits. Wait, or let Claude do the task itself.
 - **Very large answers.** Claude Code caps MCP tool results at about 25k tokens (`MAX_MCP_OUTPUT_TOKENS`). The bridge asks Gemini to be concise; for huge jobs, split the task.
 - **`claude plugin marketplace add` fails with "Cannot prompt because user interactivity has been disabled" or "could not read Username".** Git has no credentials for the private repo. Run `gh auth setup-git`.
