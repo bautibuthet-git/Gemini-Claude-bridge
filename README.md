@@ -139,10 +139,16 @@ State lives in `~/.gemini-claude-bridge/state.json` (Windows: `C:\Users\<you>\.g
 ## Troubleshooting
 
 - **Status says the Gemini CLI isn't found, but `gemini` works in your terminal.** Claude Code was started before Node or Gemini was installed. Restart it completely.
+- **The bridge works in the terminal but not in the desktop app** (its tools never appear). The app captures `PATH` when it launches, so if Node was installed afterwards it cannot start the server. Quit the app from the system tray (not just the window) and reopen it. You can confirm the cause in the server log — look for `'node' is not recognized`:
+  ```text
+  %LOCALAPPDATA%\claude-cli-nodejs\Cache\<project>\mcp-logs-plugin-gemini-claude-bridge-gemini-claude-bridge\*.jsonl
+  ```
+  Note that one such failure is cached for all sessions (terminal included) for about 15 minutes.
 - **`not_authenticated`.** Run `gemini` in a terminal and sign in with Google.
 - **Rate limit or quota errors.** These come from your Gemini account's limits. Wait, or let Claude do the task itself.
 - **Very large answers.** Claude Code caps MCP tool results at about 25k tokens (`MAX_MCP_OUTPUT_TOKENS`). The bridge asks Gemini to be concise; for huge jobs, split the task.
 - **`claude plugin marketplace add` fails with "Cannot prompt because user interactivity has been disabled" or "could not read Username".** Git has no credentials for the private repo. Run `gh auth setup-git`.
+- **Right after reinstalling, Claude says the MCP server "failed to connect" even though `claude mcp list` shows it connected.** Claude Code caches a failed connection for about 15 minutes and skips retrying in the meantime. Wait it out, or run `claude plugin marketplace update gemini-claude-bridge` — an update changes the server's path and invalidates the cached failure.
 - **Updating.** Run `claude plugin marketplace update gemini-claude-bridge`, then restart Claude Code.
 
 ## Development
