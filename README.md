@@ -162,7 +162,10 @@ House rules:
 
 ```text
 .claude-plugin/     plugin.json + marketplace.json (self-referencing marketplace, source "./")
-.mcp.json           starts node ${CLAUDE_PLUGIN_ROOT}/dist/index.js
+mcp-servers.json    starts node ${CLAUDE_PLUGIN_ROOT}/dist/index.js; referenced from plugin.json.
+                    Deliberately not named .mcp.json: that name is also project-scoped MCP
+                    config, so opening this repo in Claude Code would prompt to approve a
+                    server whose ${CLAUDE_PLUGIN_ROOT} is undefined.
 hooks/hooks.json    SessionStart banner (node dist/index.js --check, never blocks)
 skills/gemini-ask/  /gemini-claude-bridge:gemini-ask
 src/                TypeScript source (server, tools, gemini/, state/, util/)

@@ -8,5 +8,5 @@
   "repository": "https://github.com/bautibuthet-git/gemini-claude-bridge",
   "license": "MIT",
   "keywords": ["gemini", "mcp", "delegation", "context", "tokens"],
-  "mcpServers": "./.mcp.json"
+  "mcpServers": "./mcp-servers.json"
 }
