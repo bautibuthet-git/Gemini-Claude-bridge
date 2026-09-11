@@ -17,7 +17,7 @@ import { defaultState } from "../../src/state/schema.js";
 import { StateStore } from "../../src/state/store.js";
 import { handleAsk, parseConfidence } from "../../src/tools/ask.js";
 import { handleResult } from "../../src/tools/jobs.js";
-import { formatStatus, handleStatus } from "../../src/tools/status.js";
+import { formatStatus, handleStatus, setupItems } from "../../src/tools/status.js";
 import { handleToggle } from "../../src/tools/toggle.js";
 import { BridgeError } from "../../src/util/errors.js";
 import { tempDir } from "../helpers.js";
@@ -28,6 +28,7 @@ const CLI: CliStatus = {
   version: "0.59.0",
   authOk: true,
   authDetail: "The last Gemini call succeeded.",
+  authMethod: "gemini-api-key",
   checkedAt: "2026-09-10T12:00:00.000Z",
   fromCache: false,
   ripgrep: { available: true, path: "C:\\Program Files\\rg.exe", detail: "installed" },
@@ -395,6 +396,27 @@ describe("gemini_bridge_status", () => {
     expect(missing).toContain("Setup: 2 thing(s) to fix:");
     expect(missing).toContain("Node.js 18.19.0 is too old");
     expect(missing).toContain("npm install -g @google/gemini-cli");
+  });
+
+  it("flags \"Sign in with Google\" as a setup problem even when it currently works", () => {
+    const base = {
+      state: defaultState(),
+      week: summarizeHistory([]),
+      now: new Date(),
+      stateFile: "state.json",
+      engine: "idle",
+      runningJobs: 0,
+      nodeVersion: "22.1.0",
+      platform: "win32" as const,
+    };
+    // Signed in and working (authOk: true) is still flagged: this is about what Gemini CLI's
+    // terms allow a third-party tool to do, not about whether the calls succeed.
+    expect(setupItems({ ...base, cli: { ...CLI, authOk: true, authMethod: "oauth-personal" } })).toEqual([
+      expect.stringMatching(/Sign in with Google.*terms don't allow third-party tools.*API key/s),
+    ]);
+    expect(setupItems({ ...base, cli: { ...CLI, authOk: null, authMethod: "oauth-personal" } })).toHaveLength(1);
+    // The API key we actually recommend never triggers it.
+    expect(setupItems({ ...base, cli: CLI })).toEqual([]);
   });
 
   it("works while the bridge is off", async () => {

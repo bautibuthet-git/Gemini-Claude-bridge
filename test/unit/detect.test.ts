@@ -33,22 +33,31 @@ async function geminiHome(settings?: string, withCreds = false): Promise<NodeJS.
 }
 
 describe("detectAuth", () => {
-  it("is a definite no when nothing is configured", async () => {
-    expect(detectAuth(await geminiHome())).toMatchObject({ ok: false, method: null });
+  it("is a definite no when nothing is configured, and points to an API key (not Google sign-in)", async () => {
+    const result = detectAuth(await geminiHome());
+    expect(result).toMatchObject({ ok: false, method: null });
+    expect(result.detail).toMatch(/API key/);
+    // Mentions Google sign-in only to say the bridge can't use it, never as the first thing to try.
+    expect(result.detail).not.toMatch(/choose "Sign in with Google"/);
   });
 
-  it("accepts commented settings and finds cached Google credentials", async () => {
+  it("accepts commented settings and finds cached Google credentials, but flags them as against Gemini CLI's terms for a third-party tool", async () => {
     const settings = `{
       // written by the CLI
       "security": { "auth": { "selectedType": "oauth-personal" } }, /* trailing */
       "docs": "https://example.com/not-a-comment"
     }`;
-    expect(detectAuth(await geminiHome(settings, true))).toMatchObject({ ok: true, method: "oauth-personal" });
+    const result = detectAuth(await geminiHome(settings, true));
+    expect(result).toMatchObject({ ok: true, method: "oauth-personal" });
+    expect(result.detail).toMatch(/terms don't allow third-party tools/);
+    expect(result.detail).toMatch(/API key/);
   });
 
-  it("is inconclusive for Google sign-in without a credentials file (keychain storage)", async () => {
+  it("is inconclusive for Google sign-in without a credentials file (keychain storage), but still flags the terms issue", async () => {
     const env = await geminiHome(JSON.stringify({ security: { auth: { selectedType: "oauth-personal" } } }));
-    expect(detectAuth(env)).toMatchObject({ ok: null, method: "oauth-personal" });
+    const result = detectAuth(env);
+    expect(result).toMatchObject({ ok: null, method: "oauth-personal" });
+    expect(result.detail).toMatch(/terms don't allow third-party tools/);
   });
 
   it("reads the legacy flat setting and an API key from the environment", async () => {
@@ -181,5 +190,13 @@ describe("refreshCliStatus", () => {
     install.mockResolvedValue({ installed: false, path: null, version: null });
     expect(await run(true)).toMatchObject({ installed: false, version: null, authOk: null });
     expect(auth).not.toHaveBeenCalled();
+  });
+
+  it("carries the auth method through, fresh or from cache, so callers can flag Google sign-in", async () => {
+    auth.mockReturnValue({ ok: true, method: "oauth-personal", detail: "…" });
+    expect(await run(true)).toMatchObject({ authMethod: "oauth-personal" });
+    // Served from cache: the version check is skipped, but the method (cheap and local) is not.
+    now = new Date(now.getTime() + 60_000);
+    expect(await run()).toMatchObject({ authMethod: "oauth-personal", fromCache: true });
   });
 });

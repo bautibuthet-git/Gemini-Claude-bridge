@@ -34,6 +34,8 @@ export interface CliStatus {
   version: string | null;
   authOk: boolean | null;
   authDetail: string | null;
+  /** e.g. "oauth-personal", "gemini-api-key"; null when not installed or not yet configured. */
+  authMethod: string | null;
   checkedAt: string | null;
   fromCache: boolean;
   ripgrep?: RipgrepStatus;
@@ -131,16 +133,27 @@ export function detectAuth(env: NodeJS.ProcessEnv = process.env): AuthCheck {
     return {
       ok: false,
       method: null,
-      detail: 'No Gemini sign-in configured yet. Run `gemini` once in a terminal and choose "Sign in with Google" (or set GEMINI_API_KEY).',
+      detail:
+        'No Gemini sign-in configured yet. Create a free API key at https://aistudio.google.com/apikey, put GEMINI_API_KEY=<key> in ~/.gemini/.env, then choose "Gemini API key" via /auth inside `gemini` (Gemini CLI\'s terms do not allow third-party tools like this bridge to use "Sign in with Google").',
     };
   }
   if (method === "oauth-personal") {
+    // Gemini CLI's own terms name third-party tools using this sign-in as a violation that can
+    // get the account suspended (see docs/resources/tos-privacy.md and the FAQ, which names
+    // Claude Code specifically). "ok: true" here is about whether calls will work, not whether
+    // they're allowed; setupItems() turns this into a setup item regardless of ok.
     return fs.existsSync(path.join(dir, "oauth_creds.json"))
-      ? { ok: true, method, detail: "Signed in with Google (cached credentials found)." }
+      ? {
+          ok: true,
+          method,
+          detail:
+            "Signed in with Google (cached credentials found) — but Gemini CLI's terms don't allow third-party tools like this bridge to use this sign-in. Switch to a Gemini API key (see Setup).",
+        }
       : {
           ok: null,
           method,
-          detail: "Google sign-in is selected; its credentials may be in the OS keychain. The next Gemini call will confirm.",
+          detail:
+            "Google sign-in is selected, but Gemini CLI's terms don't allow third-party tools like this bridge to use it. Switch to a Gemini API key (see Setup).",
         };
   }
   if (method === "gemini-api-key") {
@@ -180,12 +193,16 @@ export async function refreshCliStatus(store: StateStore, opts: RefreshOptions =
   if (!opts.force && Number.isFinite(lastCheck) && now.getTime() - lastCheck < (opts.ttlMs ?? DETECT_TTL_MS)) {
     const installed = cached.lastDetectedVersion !== null;
     const cliPath = installed ? (opts.findPath ?? (() => findOnPath(geminiCommand(), geminiEnv())))() : null;
+    // Cheap, local and always fresh (unlike the version check above): whether the configured
+    // sign-in method is one Gemini CLI's terms allow this bridge to use never goes stale.
+    const authMethod = installed ? (opts.detectAuth ?? (() => detectAuth()))().method : null;
     return {
       installed,
       path: cliPath,
       version: cached.lastDetectedVersion,
       authOk: installed ? cached.lastAuthOk : null,
       authDetail: installed ? cached.lastAuthDetail : null,
+      authMethod,
       checkedAt: cached.lastInstalledCheckAt,
       fromCache: true,
       ...(installed ? { ripgrep: ripgrepFor(cliPath) } : {}),
@@ -214,6 +231,7 @@ export async function refreshCliStatus(store: StateStore, opts: RefreshOptions =
     version: next.geminiCli.lastDetectedVersion,
     authOk: install.installed ? next.geminiCli.lastAuthOk : null,
     authDetail: install.installed ? next.geminiCli.lastAuthDetail : null,
+    authMethod: install.installed ? (auth?.method ?? null) : null,
     checkedAt: stamp,
     fromCache: false,
     ...(install.installed ? { ripgrep: ripgrepFor(install.path) } : {}),

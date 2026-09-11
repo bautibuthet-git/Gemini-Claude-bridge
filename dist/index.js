@@ -8493,14 +8493,18 @@ function detectAuth(env = process.env) {
     return {
       ok: false,
       method: null,
-      detail: 'No Gemini sign-in configured yet. Run `gemini` once in a terminal and choose "Sign in with Google" (or set GEMINI_API_KEY).'
+      detail: 'No Gemini sign-in configured yet. Create a free API key at https://aistudio.google.com/apikey, put GEMINI_API_KEY=<key> in ~/.gemini/.env, then choose "Gemini API key" via /auth inside `gemini` (Gemini CLI\'s terms do not allow third-party tools like this bridge to use "Sign in with Google").'
     };
   }
   if (method === "oauth-personal") {
-    return fs2.existsSync(path2.join(dir, "oauth_creds.json")) ? { ok: true, method, detail: "Signed in with Google (cached credentials found)." } : {
+    return fs2.existsSync(path2.join(dir, "oauth_creds.json")) ? {
+      ok: true,
+      method,
+      detail: "Signed in with Google (cached credentials found) \u2014 but Gemini CLI's terms don't allow third-party tools like this bridge to use this sign-in. Switch to a Gemini API key (see Setup)."
+    } : {
       ok: null,
       method,
-      detail: "Google sign-in is selected; its credentials may be in the OS keychain. The next Gemini call will confirm."
+      detail: "Google sign-in is selected, but Gemini CLI's terms don't allow third-party tools like this bridge to use it. Switch to a Gemini API key (see Setup)."
     };
   }
   if (method === "gemini-api-key") {
@@ -8522,12 +8526,14 @@ async function refreshCliStatus(store, opts = {}) {
   if (!opts.force && Number.isFinite(lastCheck) && now.getTime() - lastCheck < (opts.ttlMs ?? DETECT_TTL_MS)) {
     const installed = cached2.lastDetectedVersion !== null;
     const cliPath = installed ? (opts.findPath ?? (() => findOnPath(geminiCommand(), geminiEnv())))() : null;
+    const authMethod = installed ? (opts.detectAuth ?? (() => detectAuth()))().method : null;
     return {
       installed,
       path: cliPath,
       version: cached2.lastDetectedVersion,
       authOk: installed ? cached2.lastAuthOk : null,
       authDetail: installed ? cached2.lastAuthDetail : null,
+      authMethod,
       checkedAt: cached2.lastInstalledCheckAt,
       fromCache: true,
       ...installed ? { ripgrep: ripgrepFor(cliPath) } : {}
@@ -8553,6 +8559,7 @@ async function refreshCliStatus(store, opts = {}) {
     version: next.geminiCli.lastDetectedVersion,
     authOk: install.installed ? next.geminiCli.lastAuthOk : null,
     authDetail: install.installed ? next.geminiCli.lastAuthDetail : null,
+    authMethod: install.installed ? auth?.method ?? null : null,
     checkedAt: stamp,
     fromCache: false,
     ...install.installed ? { ripgrep: ripgrepFor(install.path) } : {}
@@ -39690,8 +39697,12 @@ function setupItems({ cli, platform = process.platform, nodeVersion = process.ve
   }
   if (!cli.installed) {
     items.push("The Gemini CLI is missing: run `npm install -g @google/gemini-cli`, then restart Claude Code.");
+  } else if (cli.authMethod === "oauth-personal") {
+    items.push(
+      'Signed in with "Sign in with Google", but Gemini CLI\'s terms don\'t allow third-party tools like this bridge to use that sign-in (Google can suspend the account for it). Switch to a free API key: create one at https://aistudio.google.com/apikey, put `GEMINI_API_KEY=<key>` in `~/.gemini/.env`, then choose "Gemini API key" via `/auth` inside `gemini`.'
+    );
   } else if (cli.authOk === false) {
-    items.push(`Gemini isn't signed in: ${cli.authDetail ?? "run `gemini` once in a terminal and sign in with Google."}`);
+    items.push(`Gemini isn't signed in: ${cli.authDetail ?? "create a free API key at https://aistudio.google.com/apikey and set it up per the README."}`);
   }
   if (cli.installed && cli.ripgrep && !cli.ripgrep.available) {
     items.push(`Optional, for faster searches: install ripgrep ${ripgrepInstall(platform)}.`);

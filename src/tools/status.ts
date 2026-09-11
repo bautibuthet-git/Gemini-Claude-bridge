@@ -150,8 +150,14 @@ export function setupItems({ cli, platform = process.platform, nodeVersion = pro
   }
   if (!cli.installed) {
     items.push("The Gemini CLI is missing: run `npm install -g @google/gemini-cli`, then restart Claude Code.");
+  } else if (cli.authMethod === "oauth-personal") {
+    // Flagged regardless of authOk: this is about what Gemini CLI's terms allow a third-party
+    // tool to do, not about whether the calls currently succeed (they often do).
+    items.push(
+      "Signed in with \"Sign in with Google\", but Gemini CLI's terms don't allow third-party tools like this bridge to use that sign-in (Google can suspend the account for it). Switch to a free API key: create one at https://aistudio.google.com/apikey, put `GEMINI_API_KEY=<key>` in `~/.gemini/.env`, then choose \"Gemini API key\" via `/auth` inside `gemini`.",
+    );
   } else if (cli.authOk === false) {
-    items.push(`Gemini isn't signed in: ${cli.authDetail ?? "run `gemini` once in a terminal and sign in with Google."}`);
+    items.push(`Gemini isn't signed in: ${cli.authDetail ?? "create a free API key at https://aistudio.google.com/apikey and set it up per the README."}`);
   }
   if (cli.installed && cli.ripgrep && !cli.ripgrep.available) {
     items.push(`Optional, for faster searches: install ripgrep ${ripgrepInstall(platform)}.`);

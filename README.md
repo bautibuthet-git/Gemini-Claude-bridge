@@ -45,19 +45,17 @@ La forma más fácil de cumplirlos es instalar el plugin y correr `/gemini-claud
 
 1. **Claude Code** (CLI, app de escritorio o extensión del IDE).
 2. **Node.js 20 o más nuevo.** Claude Code arranca el bridge con `node`. En Windows: `winget install OpenJS.NodeJS.LTS`. En macOS: `brew install node`.
-3. **El CLI de Gemini, logueado con *tu propia* cuenta:**
+3. **El CLI de Gemini, con una API key propia:**
    ```bash
    npm install -g @google/gemini-cli
-   gemini
    ```
-   Dentro de `gemini`, elegí **Sign in with Google**, terminá en el navegador y salí con `/quit`.
-
-   Si Google responde `IneligibleTierError` ("no longer supported for Gemini Code Assist for individuals"), usá una API key gratuita:
-   - Creala en https://aistudio.google.com/apikey.
+   - Creala gratis en https://aistudio.google.com/apikey (con una cuenta de Google cualquiera; no hace falta tarjeta).
    - Poné `GEMINI_API_KEY=<tu key>` en `~/.gemini/.env` (en Windows: `C:\Users\<vos>\.gemini\.env`).
-   - Elegí **Gemini API key** con `/auth` dentro de `gemini`.
+   - Corré `gemini` una vez y elegí **Gemini API key**.
 
    El bridge nunca toca la key.
+
+   **No inicies sesión con "Sign in with Google" para esto.** Los [términos del CLI de Gemini](https://github.com/google-gemini/gemini-cli/blob/main/docs/resources/tos-privacy.md) prohíben que una herramienta de terceros —este bridge incluido— use ese inicio de sesión para acceder a Gemini; su propio [FAQ](https://github.com/google-gemini/gemini-cli/blob/main/docs/resources/faq.md) nombra a Claude Code como ejemplo. Hacerlo puede terminar en la suspensión de la cuenta de Google. Por eso, aunque una suscripción **Google AI Pro/Ultra** (la que suelen dar gratis a estudiantes) te daría más cuota vía "Sign in with Google", el bridge no la usa ni la va a usar: se queda con la API key, que es el método que Google mismo recomienda para agentes de terceros. Si ya usabas `gemini` con tu cuenta de Google para vos mismo, cambiá a la API key antes de usar el bridge — `gemini_bridge_status` avisa si sigue detectando ese inicio de sesión.
 4. **Acceso a este repo privado.** El dueño te agrega como colaborador, y git necesita credenciales de GitHub:
    ```bash
    gh auth login
@@ -174,7 +172,7 @@ Esto importa porque Claude solo ve la respuesta de Gemini. Si Gemini hace una le
 |---|---|
 | `disabled` | El bridge está apagado. Claude hace la tarea él mismo. |
 | `not_installed` | `gemini` no está en el PATH. Instalalo; el bridge también lo busca en las carpetas de instalación estándar. |
-| `not_authenticated` | Corré `gemini` una vez y logueate, o pasate a una API key (ver Requisitos). |
+| `not_authenticated` | Configurá una API key (ver Requisitos). |
 | `quota` | Todos los modelos de la cadena están sin cuota. El mensaje dice cuándo se recupera cada uno. |
 | `timeout` | Achicá la tarea, usá `background: true` o subí `timeoutMs`. |
 | `gemini_error` | Cualquier otro error del CLI, con su mensaje. |
@@ -196,6 +194,8 @@ Con una key gratuita:
 - `pro` no tiene cuota, y `flash` da unos 20 pedidos por día. Las cadenas lo manejan solas, y `gemini_bridge_status` muestra qué modelos están en espera y hasta cuándo. Si `flash` agota su cuota diaria en medio de una llamada, esa llamada pierde ~40 s en darse cuenta; las siguientes lo saltean hasta la medianoche del Pacífico.
 - `flash-lite` tiene un **tope de 250.000 tokens de entrada por minuto**. Un log de 4.000 líneas se come buena parte, y preguntar dos veces por él dentro del mismo minuto hacía esperar 64 s al CLI. Ahora el bridge ve venir esa espera: usa otro modelo o pasa la llamada a segundo plano. Una repregunta reenvía la conversación (archivo incluido), así que también cuenta.
 - El modelo más liviano puede equivocarse en detalles (copió `10:58` en vez de `10:57`) o exagerar en una revisión. Para eso están la verificación de citas, la marca de "primera pasada", la confianza declarada y `thorough`.
+
+**¿Se puede usar la cuota de una suscripción Google AI Pro/Ultra (la que dan gratis a estudiantes) para tener más margen?** No con este bridge. Esa cuota más alta (1.500 pedidos/día, contra 250/día de una API key gratis, según la [documentación del CLI](https://github.com/google-gemini/gemini-cli/blob/main/docs/resources/quota-and-pricing.md)) solo se habilita iniciando sesión con Google, y eso es justamente lo que sus [términos](https://github.com/google-gemini/gemini-cli/blob/main/docs/resources/tos-privacy.md) prohíben para una herramienta de terceros. La forma de tener más margen sin ese riesgo es habilitar facturación en la misma API key gratuita (pago por uso en Google AI Studio): no cambia nada del bridge, y los precios de Gemini son bajos — pero es plata real, así que es una decisión tuya, no algo que el bridge haga solo.
 
 ## Privacidad y seguridad
 
@@ -254,8 +254,9 @@ Variables de entorno:
 ## Problemas comunes
 
 - **Las herramientas del bridge no aparecen en la app de escritorio.** La app toma el `PATH` al abrirse; si Node se instaló después, no puede arrancar el servidor. Cerrala desde la bandeja del sistema (revisá que no queden procesos `claude` en el Administrador de tareas, o reiniciá la PC) y abrí una conversación **nueva**. Para confirmar la causa, buscá `'node' is not recognized` en `%LOCALAPPDATA%\claude-cli-nodejs\Cache\<proyecto>\mcp-logs-plugin-gemini-claude-bridge-gemini-claude-bridge\*.jsonl`. Una conexión fallida también queda en caché unos 15 minutos; `claude plugin marketplace update gemini-claude-bridge` la limpia.
-- **`not_authenticated`.** Corré `gemini` en una terminal y logueate. Con `IneligibleTierError` no sirve volver a loguearse: pasate a una API key.
+- **`not_authenticated`, o `IneligibleTierError`.** Configurá una API key (ver Requisitos) — no hace falta loguearse con Google.
 - **`quota`, o solo responde flash-lite.** Tus modelos están en espera; `gemini_bridge_status` dice hasta cuándo. Es el plan gratuito funcionando como corresponde.
+- **`gemini_bridge_status` avisa que estás usando "Sign in with Google".** Cambiá a una API key (ver Requisitos): los términos del CLI de Gemini no permiten que una herramienta de terceros como este bridge use ese inicio de sesión, ni siquiera con una suscripción Google AI Pro/Ultra.
 - **El estado dice `ripgrep: no (installed outside Program Files…)`.** Reinstalalo para toda la máquina desde una terminal de administrador (ver Requisitos).
 - **Respuestas muy largas.** Claude Code corta los resultados de herramientas en unos 25.000 tokens (`MAX_MCP_OUTPUT_TOKENS`). Pedí un `format` más acotado o dividí la tarea.
 - **`claude plugin marketplace add` falla con "could not read Username".** Corré `gh auth setup-git`.
