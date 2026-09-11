@@ -15,6 +15,8 @@ interface AgentOptions {
   setModelError?: string;
   /** Written to stderr when a prompt arrives (the agent then answers, unless hang is set). */
   promptStderr?: string;
+  /** Tool calls reported before the answer. */
+  toolCalls?: Array<{ kind: string; title: string }>;
 }
 
 /** A scripted `gemini --acp`: answers the protocol over the fake child's stdio. */
@@ -76,6 +78,9 @@ function fakeAgent(options: AgentOptions = {}) {
             method: "session/request_permission",
             params: { sessionId, options: [{ optionId: "yes", kind: "allow_once" }, { optionId: "no", kind: "reject_once" }], toolCall: {} },
           });
+        }
+        for (const tool of options.toolCalls ?? []) {
+          send({ jsonrpc: "2.0", method: "session/update", params: { sessionId, update: { sessionUpdate: "tool_call", toolCallId: tool.title, status: "in_progress", ...tool } } });
         }
         for (const text of ["Hello ", "world"]) {
           send({ jsonrpc: "2.0", method: "session/update", params: { sessionId, update: { sessionUpdate: "agent_message_chunk", content: { type: "text", text } } } });
@@ -170,6 +175,22 @@ describe("AcpEngine", () => {
     const result = await engine.run({ prompt: "x", model: "auto", timeoutMs: 5_000, onNotice: (m) => notices.push(m) });
     expect(result.text).toBe("Hello world");
     expect(notices).toEqual(["Gemini hit its per-minute quota; the Gemini CLI waits ~64s and retries by itself…"]);
+    engine.close();
+  });
+
+  it("reports the files Gemini reads and searches as progress, but not its bookkeeping", async () => {
+    const notices: string[] = [];
+    const agent = fakeAgent({
+      toolCalls: [
+        { kind: "think", title: 'Update tactical intent: "review the module"' },
+        { kind: "read", title: "src\\app.ts" },
+        { kind: "search", title: "src" },
+      ],
+    });
+    const { engine } = engineWith(agent);
+    const result = await engine.run({ prompt: "x", model: "auto", timeoutMs: 5_000, onNotice: (m) => notices.push(m) });
+    expect(result.text).toBe("Hello world");
+    expect(notices).toEqual(["Gemini is reading src\\app.ts…", "Gemini is searching src…"]);
     engine.close();
   });
 

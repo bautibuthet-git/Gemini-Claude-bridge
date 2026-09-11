@@ -56,6 +56,18 @@ describe("detectAuth", () => {
     expect(detectAuth({ ...env, GEMINI_API_KEY: "k" })).toMatchObject({ ok: true, method: "gemini-api-key" });
   });
 
+  it("finds an API key in ~/.gemini/.env, and ignores an empty value or a placeholder", async () => {
+    const env = await geminiHome(JSON.stringify({ security: { auth: { selectedType: "gemini-api-key" } } }));
+    const envFile = path.join(dir, ".gemini", ".env");
+    expect(detectAuth(env)).toMatchObject({ ok: null, method: "gemini-api-key" });
+
+    await fs.writeFile(envFile, "# key\nGEMINI_API_KEY=PEGA_TU_KEY_ACA\n");
+    expect(detectAuth(env).ok).toBeNull();
+
+    await fs.writeFile(envFile, 'OTHER=1\nGEMINI_API_KEY="AIzaSyExampleExample"\n');
+    expect(detectAuth(env)).toMatchObject({ ok: true, detail: expect.stringContaining(".env") });
+  });
+
   it("falls back to environment-only configuration", async () => {
     expect(detectAuth({ ...(await geminiHome()), GEMINI_API_KEY: "k" })).toMatchObject({ ok: true, method: "gemini-api-key" });
   });
@@ -106,15 +118,15 @@ describe("detectRipgrep", () => {
   it("rejects an rg outside the folders the Gemini CLI trusts, like it does", async () => {
     await fs.writeFile(path.join(dir, "rg"), "");
     await fs.writeFile(path.join(dir, "rg.exe"), "");
-    // ProgramFiles points somewhere else, so the temp folder is neither augmented nor trusted.
-    expect(detectRipgrep(null, { PATH: dir, PATHEXT: ".EXE", ProgramFiles: path.join(dir, "pf") })).toMatchObject({
+    // ProgramFiles points somewhere else, so the temp folder isn't trusted; no install folders are appended.
+    expect(detectRipgrep(null, { PATH: dir, PATHEXT: ".EXE", ProgramFiles: path.join(dir, "pf") }, process.platform, false)).toMatchObject({
       available: false,
       detail: expect.stringMatching(/outside Program Files/),
     });
   });
 
   it("reports a missing rg", () => {
-    expect(detectRipgrep(null, { PATH: dir, ProgramFiles: dir })).toMatchObject({ available: false, path: null });
+    expect(detectRipgrep(null, { PATH: dir, ProgramFiles: dir }, process.platform, false)).toMatchObject({ available: false, path: null });
   });
 });
 

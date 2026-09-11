@@ -74,6 +74,13 @@ export const stateSchema = z.object({
   ),
   /** Models that recently ran out of quota (or don't exist for this account) are skipped until `until`. */
   modelCooldowns: z.record(z.string(), z.object({ until: z.string(), reason: z.string() })).default(() => ({})),
+  /**
+   * Per-minute input-token limits, learned from the quota errors Google returns (the free tier's
+   * are small: 250,000 for flash-lite). Used to avoid sending a big file into a wait.
+   */
+  modelLimits: z
+    .record(z.string(), z.object({ inputTokensPerMinute: z.number().int().positive(), learnedAt: z.string() }))
+    .default(() => ({})),
   geminiCli: z.preprocess(
     orEmpty,
     z.object({

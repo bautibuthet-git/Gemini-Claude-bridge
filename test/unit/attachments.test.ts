@@ -19,11 +19,11 @@ const target = (absolute: string, isDirectory = false): ResolvedPath => ({ input
 
 describe("numberLines", () => {
   it("numbers lines, handles CRLF, drops the trailing newline and escapes at-signs", () => {
-    expect(numberLines("a\r\nb@c\n")).toEqual({ text: "1: a\n2: b\\@c", lines: 2 });
+    expect(numberLines("a\r\nb@c\n")).toEqual({ text: "1: a\n2: b\\@c", lines: 2, raw: ["a", "b@c"] });
   });
 
   it("treats an empty file as zero lines", () => {
-    expect(numberLines("")).toEqual({ text: "", lines: 0 });
+    expect(numberLines("")).toEqual({ text: "", lines: 0, raw: [] });
   });
 });
 

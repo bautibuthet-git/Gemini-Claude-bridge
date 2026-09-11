@@ -12,8 +12,10 @@ export const SERVER_NAME = "gemini-claude-bridge";
 /** Claude Code adds this to Claude's system prompt every session, so it is kept short. */
 export const INSTRUCTIONS = [
   "Gemini bridge: delegate self-contained subtasks to Google Gemini (through the user's local gemini CLI) to save your own context and tokens.",
-  "- gemini_ask: for summarizing or analyzing large files and logs, many files, broad codebase questions, second-opinion reviews, drafting boilerplate/tests/docs, and plans. Put the files in `paths` instead of reading them yourself, and say in `format` exactly what you need back. Run independent tasks as parallel calls; for long ones pass background: true and collect them with gemini_result while you keep working. Before relying on a specific line or value Gemini cites, read just those lines. Gemini only returns text; you make any edits. Do small or conversation-dependent tasks yourself.",
-  '- When the user asks to turn the Gemini bridge (or Gemini delegation) on or off, in any language (e.g. "apagá el bridge"), call gemini_bridge_toggle. When they ask whether it is on or working, call gemini_bridge_status.',
+  '- Delegate the reading, not the thinking: use gemini_ask to get facts, locations and exact quotes out of large files, logs or many files (e.g. "every place user input reaches a SQL query, with the line"), then make the judgments yourself. Put the files in `paths` instead of reading them, say in `goal` what the answer is for and in `format` what you need back.',
+  "- The bridge checks Gemini's file:line quotes against the files and flags mismatches, and marks judgment answers from the lightest model as a first pass. Verify what you rely on (read just the cited lines) and use thorough: true for decisions that matter. Gemini only returns text; you make any edits.",
+  "- Run independent tasks as parallel calls; long ones with background: true, collected with gemini_result. Do small or conversation-dependent tasks yourself.",
+  '- When the user asks to turn the Gemini bridge (or Gemini delegation) on or off, in any language (e.g. "apagá el bridge"), call gemini_bridge_toggle. When they ask whether it is on or working, call gemini_bridge_status; /gemini-claude-bridge:setup walks them through fixing the setup.',
 ].join("\n");
 
 /** The tool list is static; on/off is a flag checked inside gemini_ask. */

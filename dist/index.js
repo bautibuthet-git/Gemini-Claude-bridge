@@ -47,7 +47,7 @@ var require_windows = __commonJS({
     module.exports = isexe;
     isexe.sync = sync;
     var fs8 = __require("fs");
-    function checkPathExt(path7, options) {
+    function checkPathExt(path8, options) {
       var pathext = options.pathExt !== void 0 ? options.pathExt : process.env.PATHEXT;
       if (!pathext) {
         return true;
@@ -58,25 +58,25 @@ var require_windows = __commonJS({
       }
       for (var i = 0; i < pathext.length; i++) {
         var p = pathext[i].toLowerCase();
-        if (p && path7.substr(-p.length).toLowerCase() === p) {
+        if (p && path8.substr(-p.length).toLowerCase() === p) {
           return true;
         }
       }
       return false;
     }
-    function checkStat(stat, path7, options) {
+    function checkStat(stat, path8, options) {
       if (!stat.isSymbolicLink() && !stat.isFile()) {
         return false;
       }
-      return checkPathExt(path7, options);
+      return checkPathExt(path8, options);
     }
-    function isexe(path7, options, cb) {
-      fs8.stat(path7, function(er, stat) {
-        cb(er, er ? false : checkStat(stat, path7, options));
+    function isexe(path8, options, cb) {
+      fs8.stat(path8, function(er, stat) {
+        cb(er, er ? false : checkStat(stat, path8, options));
       });
     }
-    function sync(path7, options) {
-      return checkStat(fs8.statSync(path7), path7, options);
+    function sync(path8, options) {
+      return checkStat(fs8.statSync(path8), path8, options);
     }
   }
 });
@@ -87,13 +87,13 @@ var require_mode = __commonJS({
     module.exports = isexe;
     isexe.sync = sync;
     var fs8 = __require("fs");
-    function isexe(path7, options, cb) {
-      fs8.stat(path7, function(er, stat) {
+    function isexe(path8, options, cb) {
+      fs8.stat(path8, function(er, stat) {
         cb(er, er ? false : checkStat(stat, options));
       });
     }
-    function sync(path7, options) {
-      return checkStat(fs8.statSync(path7), options);
+    function sync(path8, options) {
+      return checkStat(fs8.statSync(path8), options);
     }
     function checkStat(stat, options) {
       return stat.isFile() && checkMode(stat, options);
@@ -126,7 +126,7 @@ var require_isexe = __commonJS({
     }
     module.exports = isexe;
     isexe.sync = sync;
-    function isexe(path7, options, cb) {
+    function isexe(path8, options, cb) {
       if (typeof options === "function") {
         cb = options;
         options = {};
@@ -136,7 +136,7 @@ var require_isexe = __commonJS({
           throw new TypeError("callback not provided");
         }
         return new Promise(function(resolve, reject) {
-          isexe(path7, options || {}, function(er, is) {
+          isexe(path8, options || {}, function(er, is) {
             if (er) {
               reject(er);
             } else {
@@ -145,7 +145,7 @@ var require_isexe = __commonJS({
           });
         });
       }
-      core(path7, options || {}, function(er, is) {
+      core(path8, options || {}, function(er, is) {
         if (er) {
           if (er.code === "EACCES" || options && options.ignoreErrors) {
             er = null;
@@ -155,9 +155,9 @@ var require_isexe = __commonJS({
         cb(er, is);
       });
     }
-    function sync(path7, options) {
+    function sync(path8, options) {
       try {
-        return core.sync(path7, options || {});
+        return core.sync(path8, options || {});
       } catch (er) {
         if (options && options.ignoreErrors || er.code === "EACCES") {
           return false;
@@ -173,7 +173,7 @@ var require_isexe = __commonJS({
 var require_which = __commonJS({
   "node_modules/which/which.js"(exports, module) {
     var isWindows = process.platform === "win32" || process.env.OSTYPE === "cygwin" || process.env.OSTYPE === "msys";
-    var path7 = __require("path");
+    var path8 = __require("path");
     var COLON = isWindows ? ";" : ":";
     var isexe = require_isexe();
     var getNotFoundError = (cmd) => Object.assign(new Error(`not found: ${cmd}`), { code: "ENOENT" });
@@ -211,7 +211,7 @@ var require_which = __commonJS({
           return opt.all && found.length ? resolve(found) : reject(getNotFoundError(cmd));
         const ppRaw = pathEnv[i];
         const pathPart = /^".*"$/.test(ppRaw) ? ppRaw.slice(1, -1) : ppRaw;
-        const pCmd = path7.join(pathPart, cmd);
+        const pCmd = path8.join(pathPart, cmd);
         const p = !pathPart && /^\.[\\\/]/.test(cmd) ? cmd.slice(0, 2) + pCmd : pCmd;
         resolve(subStep(p, i, 0));
       });
@@ -238,7 +238,7 @@ var require_which = __commonJS({
       for (let i = 0; i < pathEnv.length; i++) {
         const ppRaw = pathEnv[i];
         const pathPart = /^".*"$/.test(ppRaw) ? ppRaw.slice(1, -1) : ppRaw;
-        const pCmd = path7.join(pathPart, cmd);
+        const pCmd = path8.join(pathPart, cmd);
         const p = !pathPart && /^\.[\\\/]/.test(cmd) ? cmd.slice(0, 2) + pCmd : pCmd;
         for (let j = 0; j < pathExt.length; j++) {
           const cur = p + pathExt[j];
@@ -286,7 +286,7 @@ var require_path_key = __commonJS({
 var require_resolveCommand = __commonJS({
   "node_modules/cross-spawn/lib/util/resolveCommand.js"(exports, module) {
     "use strict";
-    var path7 = __require("path");
+    var path8 = __require("path");
     var which = require_which();
     var getPathKey = require_path_key();
     function resolveCommandAttempt(parsed, withoutPathExt) {
@@ -304,7 +304,7 @@ var require_resolveCommand = __commonJS({
       try {
         resolved = which.sync(parsed.command, {
           path: env[getPathKey({ env })],
-          pathExt: withoutPathExt ? path7.delimiter : void 0
+          pathExt: withoutPathExt ? path8.delimiter : void 0
         });
       } catch (e) {
       } finally {
@@ -313,7 +313,7 @@ var require_resolveCommand = __commonJS({
         }
       }
       if (resolved) {
-        resolved = path7.resolve(hasCustomCwd ? parsed.options.cwd : "", resolved);
+        resolved = path8.resolve(hasCustomCwd ? parsed.options.cwd : "", resolved);
       }
       return resolved;
     }
@@ -367,8 +367,8 @@ var require_shebang_command = __commonJS({
       if (!match) {
         return null;
       }
-      const [path7, argument] = match[0].replace(/#! ?/, "").split(" ");
-      const binary = path7.split("/").pop();
+      const [path8, argument] = match[0].replace(/#! ?/, "").split(" ");
+      const binary = path8.split("/").pop();
       if (binary === "env") {
         return argument;
       }
@@ -403,7 +403,7 @@ var require_readShebang = __commonJS({
 var require_parse = __commonJS({
   "node_modules/cross-spawn/lib/parse.js"(exports, module) {
     "use strict";
-    var path7 = __require("path");
+    var path8 = __require("path");
     var resolveCommand = require_resolveCommand();
     var escape2 = require_escape();
     var readShebang = require_readShebang();
@@ -428,7 +428,7 @@ var require_parse = __commonJS({
       const needsShell = !isExecutableRegExp.test(commandFile);
       if (parsed.options.forceShell || needsShell) {
         const needsDoubleEscapeMetaChars = isCmdShimRegExp.test(commandFile);
-        parsed.command = path7.normalize(parsed.command);
+        parsed.command = path8.normalize(parsed.command);
         parsed.command = escape2.command(parsed.command);
         parsed.args = parsed.args.map((arg) => escape2.argument(arg, needsDoubleEscapeMetaChars));
         const shellCommand = [parsed.command].concat(parsed.args).join(" ");
@@ -2850,8 +2850,8 @@ var require_resolve = __commonJS({
       }
       return count;
     }
-    function getFullPath(resolver, id = "", normalize) {
-      if (normalize !== false)
+    function getFullPath(resolver, id = "", normalize2) {
+      if (normalize2 !== false)
         id = normalizeId(id);
       const p = resolver.parse(id);
       return _getFullPath(resolver, p);
@@ -3877,8 +3877,8 @@ var require_utils = __commonJS({
       }
       return ind;
     }
-    function removeDotSegments(path7) {
-      let input2 = path7;
+    function removeDotSegments(path8) {
+      let input2 = path8;
       const output2 = [];
       let nextSlash = -1;
       let len = 0;
@@ -4287,8 +4287,8 @@ var require_schemes = __commonJS({
       }
       if (wsComponent.resourceName) {
         const queryIndex = wsComponent.resourceName.indexOf("?");
-        const path7 = queryIndex === -1 ? wsComponent.resourceName : wsComponent.resourceName.slice(0, queryIndex);
-        wsComponent.path = path7 && path7 !== "/" ? path7 : void 0;
+        const path8 = queryIndex === -1 ? wsComponent.resourceName : wsComponent.resourceName.slice(0, queryIndex);
+        wsComponent.path = path8 && path8 !== "/" ? path8 : void 0;
         wsComponent.query = queryIndex === -1 ? void 0 : wsComponent.resourceName.slice(queryIndex + 1);
         wsComponent.resourceName = void 0;
       }
@@ -4446,7 +4446,7 @@ var require_fast_uri = __commonJS({
       }
       return decodedScheme;
     }
-    function normalize(uri, options) {
+    function normalize2(uri, options) {
       if (typeof uri === "string") {
         uri = /** @type {T} */
         normalizeString(uri, options);
@@ -4823,7 +4823,7 @@ var require_fast_uri = __commonJS({
     }
     var fastUri = {
       SCHEMES,
-      normalize,
+      normalize: normalize2,
       resolve,
       resolveComponent,
       equal,
@@ -7878,9 +7878,9 @@ function withAugmentedPath(env = process.env, platform = process.platform) {
   const key = Object.keys(env).find((k) => k.toUpperCase() === "PATH") ?? "PATH";
   const separator = platform === "win32" ? ";" : ":";
   const current = (env[key] ?? "").split(separator).filter(Boolean);
-  const normalize = (dir) => platform === "win32" ? dir.toLowerCase().replace(/[\\/]+$/, "") : dir.replace(/\/+$/, "");
-  const present = new Set(current.map(normalize));
-  const missing = wellKnownBinDirs(env, platform).filter((dir) => !present.has(normalize(dir)) && isDirectory(dir));
+  const normalize2 = (dir) => platform === "win32" ? dir.toLowerCase().replace(/[\\/]+$/, "") : dir.replace(/\/+$/, "");
+  const present = new Set(current.map(normalize2));
+  const missing = wellKnownBinDirs(env, platform).filter((dir) => !present.has(normalize2(dir)) && isDirectory(dir));
   return missing.length === 0 ? env : { ...env, [key]: [...current, ...missing].join(separator) };
 }
 function wellKnownBinDirs(env, platform) {
@@ -8020,6 +8020,39 @@ function isFile(p) {
 // src/gemini/invoke.ts
 var import_cross_spawn = __toESM(require_cross_spawn(), 1);
 var import_tree_kill = __toESM(require_tree_kill(), 1);
+
+// src/gemini/budget.ts
+var WINDOW_MS = 6e4;
+var CHARS_PER_INPUT_TOKEN = 2.5;
+function estimateInputTokens(text) {
+  return Math.ceil(text.length / CHARS_PER_INPUT_TOKEN);
+}
+function parseTokenLimit(text) {
+  const match = /input_token_count[^\n]*?limit:\s*(\d+)/i.exec(text);
+  const limit = match ? Number(match[1]) : Number.NaN;
+  return limit > 0 ? limit : null;
+}
+function predictWaitMs(spends, model, tokens, limit, now) {
+  if (tokens > limit) return 0;
+  const recent = spends.filter((s) => s.model === model && now - s.at < WINDOW_MS).sort((a, b) => a.at - b.at);
+  let used = recent.reduce((sum, s) => sum + s.tokens, 0);
+  if (used + tokens <= limit) return 0;
+  for (const spend of recent) {
+    used -= spend.tokens;
+    if (used + tokens <= limit) return Math.max(0, spend.at + WINDOW_MS - now);
+  }
+  return 0;
+}
+var SpendLedger = class {
+  active = /* @__PURE__ */ new Set();
+  start(spend) {
+    this.active.add(spend);
+    return () => this.active.delete(spend);
+  }
+  list() {
+    return [...this.active];
+  }
+};
 
 // src/gemini/models.ts
 var STRONG_MODES = /* @__PURE__ */ new Set(["review", "refactor", "plan", "test"]);
@@ -8238,6 +8271,8 @@ async function invokeGemini(req, deps = {}) {
     if (!noticed && RETRY_WAIT_PATTERN.test(recentStderr)) {
       noticed = true;
       req.onNotice?.(describeWait(recentStderr));
+      const limit = parseTokenLimit(recentStderr);
+      if (limit) req.onLimit?.(limit);
     }
     return null;
   };
@@ -8281,7 +8316,15 @@ function interpretResult(r, timeoutMs) {
   const warnings = Array.isArray(json2?.warnings) ? json2.warnings.filter((w) => typeof w === "string") : [];
   const sessionId = typeof json2?.session_id === "string" ? json2.session_id : null;
   if (typeof json2?.response === "string" && json2.response.trim() && !json2.error) {
-    return { text: json2.response.trim(), model: primaryModel(json2.stats), durationMs: r.durationMs, exitCode, warnings, sessionId };
+    return {
+      text: json2.response.trim(),
+      model: primaryModel(json2.stats),
+      durationMs: r.durationMs,
+      exitCode,
+      warnings,
+      sessionId,
+      inputTokens: promptTokens(json2.stats)
+    };
   }
   if (r.stoppedBy) {
     const message2 = json2?.error?.message?.trim() || summarizeOutput(r.stderr) || r.stoppedBy;
@@ -8322,7 +8365,13 @@ ${raw}`;
   }
   const quota = parseQuota(haystack);
   if (quota) {
-    return new BridgeError("quota", `Gemini quota or rate limit reached: ${message}`, { ...details, failure: "quota", quota });
+    const tokenLimit = parseTokenLimit(haystack);
+    return new BridgeError("quota", `Gemini quota or rate limit reached: ${message}`, {
+      ...details,
+      failure: "quota",
+      quota,
+      ...tokenLimit ? { tokenLimit } : {}
+    });
   }
   if (isModelUnavailable(haystack)) {
     return new BridgeError("gemini_error", `This Gemini model is not available: ${message}`, {
@@ -8363,6 +8412,10 @@ function tryParseObject(text) {
     return null;
   }
 }
+function promptTokens(stats) {
+  const counts = Object.values(stats?.models ?? {}).map((info) => info?.tokens?.prompt).filter((n) => typeof n === "number");
+  return counts.length > 0 ? counts.reduce((a, b) => a + b, 0) : null;
+}
 function primaryModel(stats) {
   let best = null;
   let bestTokens = -1;
@@ -8399,7 +8452,7 @@ async function detectInstall(deps = {}) {
     return isErrnoException(err, "ENOENT") ? { installed: false, path: null, version: null } : { installed: true, path: resolved, version: null };
   }
 }
-function detectRipgrep(cliPath, env = process.env, platform = process.platform) {
+function detectRipgrep(cliPath, env = process.env, platform = process.platform, augment = true) {
   const binary = `rg-${platform}-${process.arch}${platform === "win32" ? ".exe" : ""}`;
   if (cliPath) {
     const bundle = path2.join(path2.dirname(cliPath), "node_modules", "@google", "gemini-cli", "bundle");
@@ -8407,7 +8460,7 @@ function detectRipgrep(cliPath, env = process.env, platform = process.platform) 
       if (fs2.existsSync(candidate)) return { available: true, path: candidate, detail: "bundled with the Gemini CLI" };
     }
   }
-  const found = findOnPath("rg", withAugmentedPath(env, platform), platform);
+  const found = findOnPath("rg", augment ? withAugmentedPath(env, platform) : env, platform);
   if (!found) return { available: false, path: null, detail: "not installed, so Gemini's searches use a slower built-in grep" };
   let real = found;
   try {
@@ -8418,13 +8471,13 @@ function detectRipgrep(cliPath, env = process.env, platform = process.platform) 
 }
 function isTrustedSystemPath(file2, env, platform) {
   if (platform === "win32") {
-    const normalize = (p) => path2.win32.resolve(p).replace(/\\/g, "/").toLowerCase();
-    const target = normalize(file2);
+    const normalize2 = (p) => path2.win32.resolve(p).replace(/\\/g, "/").toLowerCase();
+    const target = normalize2(file2);
     return [
       getEnv(env, "SystemRoot", platform) ?? "C:\\Windows",
       getEnv(env, "ProgramFiles", platform) ?? "C:\\Program Files",
       getEnv(env, "ProgramFiles(x86)", platform) ?? "C:\\Program Files (x86)"
-    ].map(normalize).some((prefix) => target === prefix || target.startsWith(`${prefix}/`));
+    ].map(normalize2).some((prefix) => target === prefix || target.startsWith(`${prefix}/`));
   }
   return ["/usr/bin", "/bin", "/usr/local/bin", "/opt/homebrew/bin", "/opt/homebrew/Cellar", "/usr/local/Cellar", "/usr/sbin", "/sbin"].some(
     (prefix) => file2 === prefix || file2.startsWith(`${prefix}/`)
@@ -8451,7 +8504,13 @@ function detectAuth(env = process.env) {
     };
   }
   if (method === "gemini-api-key") {
-    return getEnv(env, "GEMINI_API_KEY") ? { ok: true, method, detail: "Using the GEMINI_API_KEY environment variable." } : { ok: null, method, detail: "API-key sign-in is selected; the key may come from a .env file. The next Gemini call will confirm." };
+    if (getEnv(env, "GEMINI_API_KEY")) return { ok: true, method, detail: "Using the GEMINI_API_KEY environment variable." };
+    const envFile = [path2.join(dir, ".env"), path2.join(path2.dirname(dir), ".env")].find((file2) => hasDotEnvKey(file2, "GEMINI_API_KEY"));
+    return envFile ? { ok: true, method, detail: `Using the API key in ${envFile}.` } : {
+      ok: null,
+      method,
+      detail: "API-key sign-in is selected, but no GEMINI_API_KEY was found in the environment or ~/.gemini/.env. If calls fail, put GEMINI_API_KEY=<key> in ~/.gemini/.env (keys: https://aistudio.google.com/apikey)."
+    };
   }
   return { ok: null, method, detail: `Auth method "${method}" is configured. The next Gemini call will confirm it works.` };
 }
@@ -8514,6 +8573,17 @@ function authTypeFromEnv(env) {
     return "compute-default-credentials";
   }
   return null;
+}
+function hasDotEnvKey(file2, key) {
+  let text;
+  try {
+    text = fs2.readFileSync(file2, "utf8");
+  } catch {
+    return false;
+  }
+  const line = text.split(/\r?\n/).find((l) => new RegExp(`^\\s*(?:export\\s+)?${key}\\s*=`).test(l));
+  const value = line ? line.slice(line.indexOf("=") + 1).trim().replace(/^["']|["']$/g, "") : "";
+  return value.length > 0 && !/^(PEGA_TU_KEY_ACA|your[-_ ]?(api[-_ ]?)?key.*|<.*>|x+)$/i.test(value);
 }
 function readJsonc(file2) {
   try {
@@ -9374,10 +9444,10 @@ function mergeDefs(...defs) {
 function cloneDef(schema) {
   return mergeDefs(schema._zod.def);
 }
-function getElementAtPath(obj, path7) {
-  if (!path7)
+function getElementAtPath(obj, path8) {
+  if (!path8)
     return obj;
-  return path7.reduce((acc, key) => acc?.[key], obj);
+  return path8.reduce((acc, key) => acc?.[key], obj);
 }
 function promiseAllObject(promisesObj) {
   const keys = Object.keys(promisesObj);
@@ -9717,11 +9787,11 @@ function explicitlyAborted(x, startIndex = 0) {
   }
   return false;
 }
-function prefixIssues(path7, issues) {
+function prefixIssues(path8, issues) {
   return issues.map((iss) => {
     var _a3;
     (_a3 = iss).path ?? (_a3.path = []);
-    iss.path.unshift(path7);
+    iss.path.unshift(path8);
     return iss;
   });
 }
@@ -10175,16 +10245,16 @@ function flattenError(error62, mapper = (issue2) => issue2.message) {
 }
 function formatError(error62, mapper = (issue2) => issue2.message) {
   const fieldErrors = { _errors: [] };
-  const processError = (error63, path7 = []) => {
+  const processError = (error63, path8 = []) => {
     for (const issue2 of error63.issues) {
       if (issue2.code === "invalid_union" && issue2.errors.length) {
-        issue2.errors.map((issues) => processError({ issues }, [...path7, ...issue2.path]));
+        issue2.errors.map((issues) => processError({ issues }, [...path8, ...issue2.path]));
       } else if (issue2.code === "invalid_key") {
-        processError({ issues: issue2.issues }, [...path7, ...issue2.path]);
+        processError({ issues: issue2.issues }, [...path8, ...issue2.path]);
       } else if (issue2.code === "invalid_element") {
-        processError({ issues: issue2.issues }, [...path7, ...issue2.path]);
+        processError({ issues: issue2.issues }, [...path8, ...issue2.path]);
       } else {
-        const fullpath = [...path7, ...issue2.path];
+        const fullpath = [...path8, ...issue2.path];
         if (fullpath.length === 0) {
           fieldErrors._errors.push(mapper(issue2));
         } else {
@@ -10223,17 +10293,17 @@ function formatError(error62, mapper = (issue2) => issue2.message) {
 }
 function treeifyError(error62, mapper = (issue2) => issue2.message) {
   const result = { errors: [] };
-  const processError = (error63, path7 = []) => {
+  const processError = (error63, path8 = []) => {
     var _a3;
     for (const issue2 of error63.issues) {
       if (issue2.code === "invalid_union" && issue2.errors.length) {
-        issue2.errors.map((issues) => processError({ issues }, [...path7, ...issue2.path]));
+        issue2.errors.map((issues) => processError({ issues }, [...path8, ...issue2.path]));
       } else if (issue2.code === "invalid_key") {
-        processError({ issues: issue2.issues }, [...path7, ...issue2.path]);
+        processError({ issues: issue2.issues }, [...path8, ...issue2.path]);
       } else if (issue2.code === "invalid_element") {
-        processError({ issues: issue2.issues }, [...path7, ...issue2.path]);
+        processError({ issues: issue2.issues }, [...path8, ...issue2.path]);
       } else {
-        const fullpath = [...path7, ...issue2.path];
+        const fullpath = [...path8, ...issue2.path];
         if (fullpath.length === 0) {
           result.errors.push(mapper(issue2));
           continue;
@@ -10272,8 +10342,8 @@ function treeifyError(error62, mapper = (issue2) => issue2.message) {
 }
 function toDotPath(_path) {
   const segs = [];
-  const path7 = _path.map((seg) => typeof seg === "object" ? seg.key : seg);
-  for (const seg of path7) {
+  const path8 = _path.map((seg) => typeof seg === "object" ? seg.key : seg);
+  for (const seg of path8) {
     if (typeof seg === "number")
       segs.push(`[${seg}]`);
     else if (typeof seg === "symbol")
@@ -27364,13 +27434,13 @@ function resolveRef(ref, ctx) {
   if (!ref.startsWith("#")) {
     throw new Error("External $ref is not supported, only local refs (#/...) are allowed");
   }
-  const path7 = ref.slice(1).split("/").filter(Boolean);
-  if (path7.length === 0) {
+  const path8 = ref.slice(1).split("/").filter(Boolean);
+  if (path8.length === 0) {
     return ctx.rootSchema;
   }
   const defsKey = ctx.version === "draft-2020-12" ? "$defs" : "definitions";
-  if (path7[0] === defsKey) {
-    const key = path7[1] === void 0 ? void 0 : decodeJSONPointerSegment(path7[1]);
+  if (path8[0] === defsKey) {
+    const key = path8[1] === void 0 ? void 0 : decodeJSONPointerSegment(path8[1]);
     if (!key || !ctx.defs[key]) {
       throw new Error(`Reference not found: ${ref}`);
     }
@@ -28282,6 +28352,11 @@ var stateSchema = external_exports.object({
   ),
   /** Models that recently ran out of quota (or don't exist for this account) are skipped until `until`. */
   modelCooldowns: external_exports.record(external_exports.string(), external_exports.object({ until: external_exports.string(), reason: external_exports.string() })).default(() => ({})),
+  /**
+   * Per-minute input-token limits, learned from the quota errors Google returns (the free tier's
+   * are small: 250,000 for flash-lite). Used to avoid sending a big file into a wait.
+   */
+  modelLimits: external_exports.record(external_exports.string(), external_exports.object({ inputTokensPerMinute: external_exports.number().int().positive(), learnedAt: external_exports.string() })).default(() => ({})),
   geminiCli: external_exports.preprocess(
     orEmpty,
     external_exports.object({
@@ -28785,8 +28860,8 @@ function getErrorMap2() {
 
 // node_modules/zod/v3/helpers/parseUtil.js
 var makeIssue = (params) => {
-  const { data, path: path7, errorMaps, issueData } = params;
-  const fullPath = [...path7, ...issueData.path || []];
+  const { data, path: path8, errorMaps, issueData } = params;
+  const fullPath = [...path8, ...issueData.path || []];
   const fullIssue = {
     ...issueData,
     path: fullPath
@@ -28901,11 +28976,11 @@ var errorUtil;
 
 // node_modules/zod/v3/types.js
 var ParseInputLazyPath = class {
-  constructor(parent, value, path7, key) {
+  constructor(parent, value, path8, key) {
     this._cachedPath = [];
     this.parent = parent;
     this.data = value;
-    this._path = path7;
+    this._path = path8;
     this._key = key;
   }
   get path() {
@@ -32456,11 +32531,11 @@ function normalizeObjectSchema(schema) {
   }
   return void 0;
 }
-function getDotPath(path7) {
-  if (path7.length === 0) {
+function getDotPath(path8) {
+  if (path8.length === 0) {
     return "object root";
   }
-  return path7.reduce((acc, seg, index) => {
+  return path8.reduce((acc, seg, index) => {
     if (index === 0) {
       return String(seg);
     }
@@ -38091,6 +38166,7 @@ var IDLE_MS = 10 * 6e4;
 var UNHEALTHY_MS = 5 * 6e4;
 var MAX_SESSIONS = 20;
 var WATCH_GRACE_MS2 = 600;
+var TOOL_VERBS = { read: "reading", search: "searching", fetch: "fetching" };
 var RpcError = class extends Error {
   constructor(message, code) {
     super(message);
@@ -38119,6 +38195,7 @@ var AcpConnection = class {
   pending = /* @__PURE__ */ new Map();
   buffer = "";
   chunks = /* @__PURE__ */ new Map();
+  activity = /* @__PURE__ */ new Map();
   stderrListeners = /* @__PURE__ */ new Set();
   closed = null;
   stderrTail = "";
@@ -38138,12 +38215,15 @@ var AcpConnection = class {
     this.stderrListeners.add(listener);
     return () => this.stderrListeners.delete(listener);
   }
-  collect(sessionId) {
+  /** Starts collecting a session's answer; `onActivity` hears about the files Gemini reads and searches. */
+  collect(sessionId, onActivity) {
     this.chunks.set(sessionId, []);
+    if (onActivity) this.activity.set(sessionId, onActivity);
   }
   takeText(sessionId) {
     const text = (this.chunks.get(sessionId) ?? []).join("");
     this.chunks.delete(sessionId);
+    this.activity.delete(sessionId);
     return text;
   }
   /** Kills the whole process tree; `done` runs once the kill has been carried out. */
@@ -38192,9 +38272,13 @@ var AcpConnection = class {
   }
   onNotification(method, params) {
     if (method !== "session/update") return;
+    const sessionId = String(params.sessionId);
     const update = params.update;
     if (update?.sessionUpdate === "agent_message_chunk" && typeof update.content?.text === "string") {
-      this.chunks.get(String(params.sessionId))?.push(update.content.text);
+      this.chunks.get(sessionId)?.push(update.content.text);
+    } else if (update?.sessionUpdate === "tool_call" && typeof update.title === "string") {
+      const verb = TOOL_VERBS[String(update.kind)];
+      if (verb) this.activity.get(sessionId)?.(`Gemini is ${verb} ${clip(update.title)}\u2026`);
     }
   }
   /** The bridge is read-only: whatever needs approval (edits, shell) is refused. */
@@ -38261,9 +38345,14 @@ var AcpEngine = class {
       const sessionId = req.sessionId && this.sessions.has(req.sessionId) ? req.sessionId : await this.newSession(connection);
       this.sessions.set(sessionId, this.now());
       if (req.model !== "auto") await connection.request("session/set_model", { sessionId, modelId: req.model });
-      connection.collect(sessionId);
-      const result = await this.prompt(connection, sessionId, req.prompt, deadline, req);
-      const text = connection.takeText(sessionId).trim();
+      connection.collect(sessionId, req.onNotice);
+      let result;
+      let text;
+      try {
+        result = await this.prompt(connection, sessionId, req.prompt, deadline, req);
+      } finally {
+        text = connection.takeText(sessionId).trim();
+      }
       const stopReason = typeof result.stopReason === "string" ? result.stopReason : "end_turn";
       if (stopReason === "refusal") throw new BridgeError("gemini_error", "Gemini refused to answer this request.");
       if (!text) throw new BridgeError("gemini_error", `Gemini returned an empty response (stop reason: ${stopReason}).`);
@@ -38273,7 +38362,8 @@ var AcpEngine = class {
         durationMs: this.now() - startedAt,
         exitCode: 0,
         warnings: stopReason === "end_turn" ? [] : [`The answer may be incomplete (stop reason: ${stopReason}).`],
-        sessionId
+        sessionId,
+        inputTokens: inputTokensUsed(result)
       };
     } catch (err) {
       if (err instanceof BridgeError) throw err;
@@ -38386,6 +38476,8 @@ var AcpEngine = class {
         } else if (!req.failFast && !noticed && RETRY_WAIT_PATTERN.test(recentStderr)) {
           noticed = true;
           req.onNotice?.(describeWait(recentStderr));
+          const limit = parseTokenLimit(recentStderr);
+          if (limit) req.onLimit?.(limit);
         }
       });
       const onAbort = () => stop(new BridgeError("gemini_error", "The request was cancelled and Gemini was told to stop."));
@@ -38438,6 +38530,10 @@ var AcpEngine = class {
     this.idleTimer = void 0;
   }
 };
+function inputTokensUsed(result) {
+  const count = result._meta?.quota?.token_count?.input_tokens;
+  return typeof count === "number" ? count : null;
+}
 function modelUsed(result) {
   const usage = result._meta?.quota?.model_usage;
   const model = usage?.[usage.length - 1]?.model;
@@ -38449,6 +38545,10 @@ function withTimeout(promise2, ms, message) {
     timer = setTimeout(() => reject(new Error(message)), ms);
   });
   return Promise.race([promise2, timeout]).finally(() => clearTimeout(timer));
+}
+function clip(text, max = 120) {
+  const oneLine = text.replace(/\s+/g, " ").trim();
+  return oneLine.length > max ? `${oneLine.slice(0, max - 1)}\u2026` : oneLine;
 }
 function lastLine(text) {
   return text.split(/\r?\n/).map((line) => line.trim()).filter((line) => line && !/^at\s/.test(line)).pop() ?? "";
@@ -38598,6 +38698,7 @@ function createContext(store = new StateStore()) {
     cache: new ResponseCache(path6.join(home, "cache")),
     history: new History(path6.join(home, "history.jsonl")),
     jobs: new JobManager(),
+    spend: new SpendLedger(),
     refreshCli: (force) => refreshCliStatus(store, { force }),
     projectDir: () => workspaceRoot(),
     scratchDir,
@@ -38636,7 +38737,7 @@ async function prepareAttachments(targets, budgetBytes = INLINE_BUDGET_BYTES) {
     const file2 = await readText(target.absolute, remaining);
     if (file2.kind === "text") {
       const numbered = numberLines(file2.content);
-      inline.push({ path: target.absolute, lines: numbered.lines, text: numbered.text });
+      inline.push({ path: target.absolute, ...numbered });
       remaining -= Buffer.byteLength(numbered.text, "utf8");
     } else {
       const lines = file2.kind === "too_big" ? await countLines(target.absolute) : null;
@@ -38653,25 +38754,180 @@ async function readText(file2, budget) {
   const content = buffer.toString("utf8");
   return { kind: "text", content: content.charCodeAt(0) === 65279 ? content.slice(1) : content };
 }
-function numberLines(content) {
-  if (content === "") return { text: "", lines: 0 };
+function splitLines(content) {
+  if (content === "") return [];
   const lines = content.split(/\r?\n/);
   if (lines.length > 1 && lines[lines.length - 1] === "") lines.pop();
-  return { text: lines.map((line, i) => `${i + 1}: ${escapeAtSigns(line)}`).join("\n"), lines: lines.length };
+  return lines;
+}
+function numberLines(content) {
+  const raw = splitLines(content);
+  return { text: raw.map((line, i) => `${i + 1}: ${escapeAtSigns(line)}`).join("\n"), lines: raw.length, raw };
+}
+
+// src/gemini/citations.ts
+import fsp3 from "node:fs/promises";
+import path7 from "node:path";
+var MIN_QUOTE_CHARS = 6;
+var IDENTIFIER = /^[A-Za-z_$][\w$]*(?:\.[A-Za-z_$][\w$]*)*(?:\(\))?$/;
+var MAX_REPORTED = 8;
+var MAX_SHOWN_CHARS = 240;
+var MAX_SOURCE_BYTES = 8 * 1024 * 1024;
+var CITATION = /(?<file>[^\s`'"()<>|,;*]+?\.[A-Za-z0-9_+-]{1,10}):(?<line>\d+)(?:\s*[-–]\s*(?<end>\d+))?`?[^`"\n]*?(?:`(?<bq>[^`\n]+)`|"(?<dq>[^"\n]+)")/g;
+function extractCitations(answer) {
+  const citations = [];
+  const seen = /* @__PURE__ */ new Set();
+  for (const match of answer.matchAll(CITATION)) {
+    const groups = match.groups ?? {};
+    const quote = (groups.bq ?? groups.dq ?? "").trim();
+    if (quote.length < MIN_QUOTE_CHARS || IDENTIFIER.test(quote) || !groups.file || !groups.line) continue;
+    const line = Number(groups.line);
+    const lineEnd = groups.end ? Math.max(line, Number(groups.end)) : line;
+    const key = `${groups.file}:${line}:${quote}`;
+    if (seen.has(key)) continue;
+    seen.add(key);
+    citations.push({ file: groups.file, line, lineEnd, quote });
+  }
+  return citations;
+}
+function checkCitation(citation, source) {
+  const total = source.lines.length;
+  if (citation.line < 1 || citation.line > total) return { ...citation, status: "out_of_range", totalLines: total };
+  const quote = normalizeQuote(citation.quote, citation);
+  const cited = source.lines.slice(citation.line - 1, Math.min(total, citation.lineEnd)).join(" ");
+  if (containsQuote(normalize(cited), quote)) return { ...citation, status: "ok" };
+  const found = source.lines.findIndex((line) => containsQuote(normalize(line), quote));
+  if (found !== -1) return { ...citation, status: "wrong_line", actualLine: found + 1, actualText: source.lines[found] };
+  return { ...citation, status: "misquoted", actualLine: citation.line, actualText: source.lines[citation.line - 1] };
+}
+function verifyCitations(answer, sources, expectCitations = false) {
+  const checked = [];
+  for (const citation of extractCitations(answer)) {
+    const source = resolveSource(citation.file, sources);
+    if (source) checked.push(checkCitation(citation, source));
+  }
+  const problems = checked.filter((c) => c.status !== "ok");
+  if (checked.length === 0) {
+    return {
+      checked,
+      problems: 0,
+      text: expectCitations && sources.length > 0 ? "[no quotes the bridge could check against the files: treat the claims above as unverified]" : null
+    };
+  }
+  const count = (status) => checked.filter((c) => c.status === status).length;
+  const parts = [`${count("ok")} exact`];
+  if (count("wrong_line")) parts.push(`${count("wrong_line")} at a different line`);
+  if (count("misquoted")) parts.push(`${count("misquoted")} misquoted`);
+  if (count("out_of_range")) parts.push(`${count("out_of_range")} past the end of the file`);
+  const lines = [`[quotes checked by the bridge against the files: ${parts.join(" \xB7 ")}]`];
+  for (const problem of problems.slice(0, MAX_REPORTED)) lines.push(describeProblem(problem));
+  if (problems.length > MAX_REPORTED) lines.push(`\u2026 and ${problems.length - MAX_REPORTED} more.`);
+  return { checked, problems: problems.length, text: lines.join("\n") };
+}
+async function loadSources(inline, referenced, answer) {
+  const sources = inline.filter((f) => f.raw).map((f) => ({ path: f.path, lines: f.raw }));
+  const cited = extractCitations(answer).map((c) => c.file);
+  for (const ref of referenced) {
+    if (!ref.isDirectory) {
+      const lines = await readLines(ref.path);
+      if (lines) sources.push({ path: ref.path, lines });
+      continue;
+    }
+    for (const file2 of new Set(cited)) {
+      const candidate = path7.resolve(ref.path, file2.replace(/\\/g, "/"));
+      if (!candidate.startsWith(path7.resolve(ref.path)) || sources.some((s) => samePath(s.path, candidate))) continue;
+      const lines = await readLines(candidate);
+      if (lines) sources.push({ path: candidate, lines });
+    }
+  }
+  return sources;
+}
+function describeProblem(c) {
+  const where = `${c.file}:${c.line}`;
+  switch (c.status) {
+    case "wrong_line":
+      return `\u26A0 ${where}: that text is actually at line ${c.actualLine}.`;
+    case "misquoted":
+      return `\u26A0 ${where}: Gemini quoted \`${shorten(c.quote)}\` but the file says \`${shorten(c.actualText ?? "")}\`.`;
+    case "out_of_range":
+      return `\u26A0 ${where}: the file has only ${c.totalLines} lines.`;
+    default:
+      return `${where}: ok`;
+  }
+}
+function resolveSource(file2, sources) {
+  const target = file2.replace(/\\/g, "/").toLowerCase();
+  const exact = sources.find((s) => {
+    const p = s.path.replace(/\\/g, "/").toLowerCase();
+    return p === target || p.endsWith(`/${target}`);
+  });
+  if (exact) return exact;
+  const base = target.split("/").pop();
+  const byName = sources.filter((s) => s.path.replace(/\\/g, "/").toLowerCase().split("/").pop() === base);
+  return byName.length === 1 ? byName[0] : null;
+}
+function normalize(text) {
+  return text.replace(/\\@/g, "@").replace(/\s+/g, " ").trim();
+}
+function normalizeQuote(quote, citation) {
+  let q = normalize(quote);
+  const numbered = /^(\d+):\s/.exec(q);
+  if (numbered && Number(numbered[1]) >= citation.line - 1 && Number(numbered[1]) <= citation.lineEnd + 1) {
+    q = q.slice(numbered[0].length);
+  }
+  return q.replace(/^(\.\.\.|…)\s*/, "").replace(/\s*(\.\.\.|…)$/, "").trim();
+}
+function containsQuote(haystack, quote) {
+  const pieces = quote.split(/\s*(?:\.\.\.|…)\s*/).filter(Boolean);
+  let from = 0;
+  for (const piece of pieces) {
+    const at = haystack.indexOf(piece, from);
+    if (at === -1) return false;
+    from = at + piece.length;
+  }
+  return pieces.length > 0;
+}
+function shorten(text) {
+  const oneLine = text.replace(/\s+/g, " ").trim();
+  return oneLine.length > MAX_SHOWN_CHARS ? `${oneLine.slice(0, MAX_SHOWN_CHARS - 1)}\u2026` : oneLine;
+}
+function samePath(a, b) {
+  return path7.resolve(a).toLowerCase() === path7.resolve(b).toLowerCase();
+}
+async function readLines(file2) {
+  try {
+    const stat = await fsp3.stat(file2);
+    if (!stat.isFile() || stat.size > MAX_SOURCE_BYTES) return null;
+    const buffer = await fsp3.readFile(file2);
+    if (buffer.includes(0)) return null;
+    const text = buffer.toString("utf8");
+    return splitLines(text.charCodeAt(0) === 65279 ? text.slice(1) : text);
+  } catch {
+    return null;
+  }
 }
 
 // src/gemini/promptBuilder.ts
 var MODE_PREFIXES = {
   ask: "Task:",
   summarize: "Summary task. Report the key facts and anything that looks wrong, most important first. For logs: whether the run succeeded, and every error or warning with its line number and timestamp. For documents: the main points and decisions.",
-  analyze: "Analysis task. Examine the provided material and explain what matters in it: for code, its structure, responsibilities, data flow and notable design decisions; for logs or data, what happened and what stands out. Be concrete and cite specific files, lines or timestamps.",
-  review: "Critical code review. Report only problems you can point to in the code: file, line, what is wrong, why it matters and a concrete fix. Rank them critical (bugs, security), major or minor. Skip praise, style nitpicks and generic advice.",
-  refactor: "Refactoring proposal. Suggest behavior-preserving improvements to structure, naming, duplication, clarity and performance. Show the proposed code and briefly justify each change. Do not apply the changes yourself.",
-  plan: "Implementation planning. Produce a concise, ordered plan: the files to create or change, what changes in each, risks, and open questions.",
-  test: "Test design. Propose test cases covering the happy path, edge cases and failure modes, and write the test code using the project's existing test framework and conventions where visible."
+  analyze: "Analysis task. Explain what matters in the material: for code, its structure, responsibilities, data flow and notable design decisions; for logs or data, what happened and what stands out.",
+  review: "Critical code review. List only problems you can point to in the code, most severe first: the location and exact code, what is wrong, why it matters, a concrete fix, and how sure you are. Rank them critical (bugs, security), major or minor. Leave out style nitpicks, generic advice and anything you cannot show in the code.",
+  refactor: "Refactoring proposal. Suggest behavior-preserving improvements to structure, naming, duplication, clarity and performance, each tied to the exact code it changes. Show the proposed code and briefly justify each change. Do not apply the changes yourself.",
+  plan: "Implementation planning. Produce a concise, ordered plan: the files to create or change and the exact code each change touches, risks, and open questions.",
+  test: "Test design. Propose test cases covering the happy path, edge cases and failure modes, each tied to the code it exercises, and write the test code using the project's existing test framework and conventions where visible."
 };
 var FOLLOW_UP_HEADER = "Follow-up question about the material and answer above:";
-var GUARDRAIL = "Respond in plain text only (Markdown and code blocks are fine). Use your read-only tools freely \u2014 reading files, listing and searching \u2014 but change nothing: no file edits, no writes, no shell commands. Cite file names and line numbers for specific claims so they can be checked. Be concise: your answer is read by another AI assistant with a limited context window.";
+var ANSWER_RULES = [
+  "How to answer:",
+  "- Back every factual claim and finding with evidence: the file name, the line number and the exact text, written as file:line followed by that line in backticks, for example: app.ts:42 `const total = price * qty;`. Copy quoted text character for character.",
+  "- Report what the material shows. Leave final decisions to the reader; when you do judge something, say how sure you are.",
+  "- If the material is not enough to answer well, say what is missing instead of guessing.",
+  '- End with two lines: "Coverage:" what you read fully, partly or not at all; and "Confidence:" high, medium or low, with the reason.'
+].join("\n");
+var GUARDRAIL = "Respond in plain text only (Markdown and code blocks are fine). Change nothing: no file edits, no writes, no shell commands. Be concise: your answer is read by another AI assistant with a limited context window.";
+var TOOLS_ALLOWED = "Use your read-only tools freely (reading files, listing, searching) when the task needs material that is not in this conversation.";
+var TOOLS_DISCOURAGED = "Everything you need is in this conversation, and attached files are complete: answer directly, without using tools to re-read attachments or to explore other files.";
 var ATTACHED_LINE_LIMIT = 2e3;
 var TRUNCATION_NOTICE = `Only the first ${ATTACHED_LINE_LIMIT} lines of each referenced file are attached. If a file listed above as partly attached matters for this task, you MUST read its remaining lines yourself before answering \u2014 your read-only file tools can read any line range, and reading is allowed. Never conclude anything (such as "no errors") from the attached excerpt alone, and state plainly which parts you could not read.`;
 var INLINE_INTRO = "Attached files, complete. Every line starts with its line number and a colon. Inside file content each at-sign is preceded by a backslash (an escape the Gemini CLI requires); ignore that backslash.";
@@ -38680,10 +38936,14 @@ function fileReferenceLine(file2, platform = process.platform) {
   if (file2.lines == null) return reference;
   return file2.lines > ATTACHED_LINE_LIMIT ? `${reference} (${file2.lines} lines, only the first ${ATTACHED_LINE_LIMIT} attached)` : `${reference} (${file2.lines} lines)`;
 }
+function allowsTools(input2) {
+  return Boolean(input2.followUp || input2.yolo || (input2.referenced?.length ?? 0) > 0);
+}
 function buildPrompt(input2) {
   const inline = input2.inline ?? [];
   const referenced = input2.referenced ?? [];
   const sections = [input2.followUp ? FOLLOW_UP_HEADER : MODE_PREFIXES[input2.mode], escapeAtSigns(input2.prompt.trim())];
+  if (input2.goal?.trim()) sections.push(purposeLine(input2.goal));
   if (input2.format?.trim()) sections.push(`Answer format: ${escapeAtSigns(input2.format.trim())}`);
   if (inline.length > 0) sections.push(inlineSection(inline));
   if (referenced.length > 0) {
@@ -38695,8 +38955,25 @@ function buildPrompt(input2) {
       ].join("\n")
     );
   }
-  sections.push(GUARDRAIL);
+  sections.push(ANSWER_RULES, allowsTools(input2) ? TOOLS_ALLOWED : TOOLS_DISCOURAGED, GUARDRAIL);
   return sections.join("\n\n");
+}
+function buildSecondPassPrompt(goal, allowTools = false) {
+  const purpose = goal?.trim() ? ` for the purpose (${escapeAtSigns(goal.trim())})` : "";
+  return [
+    "Second pass: check your previous answer against the material before it is used.",
+    [
+      "- Is every quote exact and at the line you cited, and does it really support the claim?",
+      `- What did you miss that matters${purpose}?`,
+      "- What did you get wrong, overstate, or leave without evidence?"
+    ].join("\n"),
+    "Then write the corrected final answer in full, in the same format, ending with the Coverage and Confidence lines. Output only that final answer, not a list of your changes.",
+    allowTools ? TOOLS_ALLOWED : TOOLS_DISCOURAGED,
+    GUARDRAIL
+  ].join("\n\n");
+}
+function purposeLine(goal) {
+  return `Purpose (what the answer will be used for): ${escapeAtSigns(goal.trim())}. Keep everything that matters for this purpose, and say plainly if the material cannot support it.`;
 }
 function inlineSection(files) {
   const blocks = files.map((file2, i) => {
@@ -38713,19 +38990,27 @@ async function runGemini(ctx, req) {
   const state = await ctx.store.read();
   const deadline = ctx.now().getTime() + req.timeoutMs;
   const plan = planChain(req.chain, state.modelCooldowns, ctx.now(), req.explicitModel);
+  const waits = budgetWaits(state, await recentSpends(ctx), plan.tryOrder, req.inputTokens ?? 0, ctx.now().getTime());
+  const tryOrder = orderByBudget(plan.tryOrder, waits, req.explicitModel);
+  const first = plan.tryOrder[0];
+  if (first && tryOrder[0] !== first) {
+    req.onProgress?.(`${first}'s per-minute token quota is busy for ~${Math.ceil((waits.get(first) ?? 0) / 1e3)}s; trying ${tryOrder[0]} first\u2026`);
+  }
   const attempts = [];
   const preference = state.preferences.engine;
   let useAcp = ctx.acp !== null && preference !== "cli" && req.acpEligible && ctx.acp.isHealthy() && (!req.conversationId || ctx.acp.hasSession(req.conversationId));
   let index = 0;
   let retriedTransient = false;
-  while (index < plan.tryOrder.length) {
-    const model = plan.tryOrder[index];
+  while (index < tryOrder.length) {
+    const model = tryOrder[index];
     const remaining = deadline - ctx.now().getTime();
     if (attempts.length > 0 && remaining < MIN_ATTEMPT_MS) break;
     const engine = useAcp ? "acp" : "cli";
     const startedAt = ctx.now().getTime();
-    const failFast = index < plan.tryOrder.length - 1;
+    const failFast = index < tryOrder.length - 1;
+    const onLimit = (limit) => void learnLimit(ctx, model, limit);
     req.onProgress?.(`Asking ${model}${engine === "acp" ? " (warm process)" : ""}\u2026`);
+    const release = ctx.spend.start({ model, at: startedAt, tokens: req.inputTokens ?? 0 });
     try {
       const response = engine === "acp" ? await ctx.acp.run({
         prompt: req.prompt,
@@ -38734,7 +39019,8 @@ async function runGemini(ctx, req) {
         signal: req.signal,
         sessionId: req.conversationId,
         failFast,
-        onNotice: req.onProgress
+        onNotice: req.onProgress,
+        onLimit
       }) : await ctx.invoke({
         prompt: req.prompt,
         model,
@@ -38745,7 +39031,8 @@ async function runGemini(ctx, req) {
         signal: req.signal,
         resumeSessionId: req.conversationId,
         failFast,
-        onNotice: req.onProgress
+        onNotice: req.onProgress,
+        onLimit
       });
       attempts.push({ model, engine, outcome: "ok", ms: ctx.now().getTime() - startedAt });
       return { response, engine, attempts, skipped: plan.skipped };
@@ -38753,6 +39040,7 @@ async function runGemini(ctx, req) {
       const error62 = asBridgeError(err);
       const ms = ctx.now().getTime() - startedAt;
       const failure2 = error62.details.failure;
+      if (typeof error62.details.tokenLimit === "number") await learnLimit(ctx, model, error62.details.tokenLimit);
       if (failure2 === "engine") {
         attempts.push({ model, engine, outcome: "engine", ms, detail: error62.message });
         useAcp = false;
@@ -38765,7 +39053,7 @@ async function runGemini(ctx, req) {
           s.modelCooldowns[model] = cooldown;
         }).catch(() => void 0);
         attempts.push({ model, engine, outcome: failure2 === "unavailable" ? "unavailable" : "quota", ms, detail: cooldown.reason });
-        const next = plan.tryOrder[index + 1];
+        const next = tryOrder[index + 1];
         if (next) req.onProgress?.(`${model}: ${cooldown.reason} \u2014 trying ${next}\u2026`);
         index++;
         retriedTransient = false;
@@ -38780,9 +39068,49 @@ async function runGemini(ctx, req) {
       }
       attempts.push({ model, engine, outcome: "error", ms, detail: error62.message });
       throw new BridgeError(error62.type, error62.message, { ...error62.details, attempts });
+    } finally {
+      release();
     }
   }
   throw new BridgeError("quota", describeExhaustion(attempts, plan.skipped), { attempts, skipped: plan.skipped });
+}
+async function shortestBudgetWait(ctx, chain, explicitModel, tokens) {
+  const state = await ctx.store.read();
+  const now = ctx.now();
+  const plan = planChain(chain, state.modelCooldowns, now, explicitModel);
+  const waits = budgetWaits(state, await recentSpends(ctx), plan.tryOrder, tokens, now.getTime());
+  return plan.tryOrder.length === 0 ? 0 : Math.min(...plan.tryOrder.map((model) => waits.get(model) ?? 0));
+}
+async function recentSpends(ctx) {
+  const now = ctx.now().getTime();
+  const entries = await ctx.history.recent(new Date(now - WINDOW_MS)).catch(() => []);
+  const spends = [];
+  for (const entry of entries) {
+    if (entry.engine === "cache" || !entry.inputTokens) continue;
+    const answered = entry.attempts.filter((a) => a.outcome === "ok");
+    for (const attempt of answered) {
+      spends.push({ model: attempt.model, at: Date.parse(entry.at), tokens: Math.round(entry.inputTokens / answered.length) });
+    }
+  }
+  return [...spends, ...ctx.spend.list()];
+}
+function budgetWaits(state, spends, models, tokens, now) {
+  const waits = /* @__PURE__ */ new Map();
+  for (const model of models) {
+    const limit = state.modelLimits[model]?.inputTokensPerMinute;
+    waits.set(model, limit && tokens > 0 ? predictWaitMs(spends, model, tokens, limit, now) : 0);
+  }
+  return waits;
+}
+function orderByBudget(models, waits, explicitModel) {
+  const free = models.filter((m) => m === explicitModel || !waits.get(m));
+  const busy = models.filter((m) => m !== explicitModel && waits.get(m)).sort((a, b) => (waits.get(a) ?? 0) - (waits.get(b) ?? 0));
+  return [...free, ...busy];
+}
+async function learnLimit(ctx, model, inputTokensPerMinute) {
+  await ctx.store.update((s) => {
+    s.modelLimits[model] = { inputTokensPerMinute, learnedAt: ctx.now().toISOString() };
+  }).catch(() => void 0);
 }
 function describeExhaustion(attempts, skipped) {
   const tried = attempts.filter((a) => a.outcome !== "ok").map((a) => `${a.model} (${a.detail ?? a.outcome})`);
@@ -38817,30 +39145,37 @@ function withWarning(result, warning) {
 // src/tools/ask.ts
 var MAX_PATHS = 20;
 var HEARTBEAT_MS = 1e4;
+var AUTO_BACKGROUND_MS = 2e4;
+var MIN_SECOND_PASS_MS = 15e3;
 var ASK_DESCRIPTION = [
   "Delegate a self-contained task to Google Gemini (via the user's local, signed-in gemini CLI) to save your own context and tokens.",
-  "Good fits: summarizing or analyzing large files, logs or many files; broad codebase questions; second-opinion reviews; drafting boilerplate, docs or tests; plans.",
+  'Delegate the reading, not the thinking: ask for facts, locations and exact quotes you can reason about (e.g. "every place user input reaches a SQL query, with the line"), not for final verdicts ("is this secure?"), and make the judgment yourself.',
   "Pass files and folders in `paths` and do NOT read them yourself first: the bridge hands them to Gemini, so their contents never enter this conversation.",
-  "Gemini sees only `prompt` and `paths` (not this conversation): make the prompt stand alone and use `format` to say exactly what you need back.",
-  "Independent tasks can run as parallel gemini_ask calls; for long ones pass background: true and collect the answer with gemini_result.",
-  "Gemini only returns text; you apply any changes. Its citations can be slightly off, so before relying on a specific line or value, read just those lines.",
-  "Answers end with a followUp id: pass it as `followUp` to ask more about the same material without resending it.",
+  "Gemini sees only the prompt and the files: make the prompt stand alone, say in `goal` what the answer is for and in `format` what you need back.",
+  "Gemini's file:line quotes are checked against the files and mismatches are flagged; judgment answers from the lightest model are marked as a first pass. Verify what you rely on, and use thorough: true for decisions that matter.",
+  "Independent tasks can run as parallel calls; long ones with background: true, collected with gemini_result. Answers end with a followUp id to ask more about the same material without resending it.",
   'Not worth it for small files or quick questions. If the result has errorType "disabled", do the task yourself.'
 ].join(" ");
 var askInputSchema = {
-  prompt: external_exports.string().min(1).describe("The task for Gemini, written to stand alone: include any context it needs. Refer to attached files by name."),
+  prompt: external_exports.string().min(1).describe("The task for Gemini, written to stand alone: include any context it needs. Ask for facts and quotes rather than verdicts."),
   paths: external_exports.array(external_exports.string().min(1)).max(MAX_PATHS).optional().describe(
     `Files or folders for Gemini (max ${MAX_PATHS}). Absolute paths preferred; relative ones resolve against the project folder. Files are sent complete with line numbers; folders are read recursively, so prefer specific files.`
   ),
   mode: external_exports.enum(MODES).optional().describe(
-    "Framing preset. ask (default): general. summarize: key facts, errors with line numbers. analyze: explain code or data. review: critical review citing files and lines. refactor: behavior-preserving proposals. plan: ordered implementation plan. test: test cases plus code. review/refactor/plan/test use the strongest model with quota; the others the fastest."
+    "Framing preset. ask (default): general. summarize: key facts, errors with line numbers. analyze: explain code or data. review: problems with the exact code. refactor: behavior-preserving proposals. plan: ordered implementation plan. test: test cases plus code. review/refactor/plan/test use the strongest model with quota; the others the fastest."
+  ),
+  goal: external_exports.string().max(500).optional().describe(
+    'What the answer is for: the decision or next step it feeds (e.g. "decide whether the nightly export needs a retry"). Gemini keeps what matters for it and says when the material cannot support it.'
   ),
   format: external_exports.string().max(500).optional().describe('What you need back, e.g. "5 bullets", "only issues as file:line \u2014 problem \u2014 fix", "max 200 words". Short, targeted answers cost you fewer tokens.'),
+  thorough: external_exports.boolean().optional().describe(
+    "Second pass: Gemini re-checks its answer against the material (quotes, omissions, overstatements) and returns a corrected one. About twice the time and quota (the default time budget doubles); use it for reviews and decisions that matter, with background: true for big ones."
+  ),
   followUp: external_exports.string().regex(/^[A-Za-z0-9_-]{8,128}$/, "Use the followUp id printed at the end of an earlier answer").optional().describe("The followUp id from an earlier answer: continues that conversation, so Gemini still has its files and answer. Don't resend the same paths."),
   background: external_exports.boolean().optional().describe("Return immediately with a jobId and let Gemini work while you continue; collect the answer with gemini_result."),
   fresh: external_exports.boolean().optional().describe("Ask Gemini again even if an identical question about the same files was answered recently."),
   model: external_exports.string().regex(MODEL_PATTERN, "Model names contain only letters, digits and . _ : / -").optional().describe("Try this Gemini model first (the preference chain still backs it up). Omit to let the bridge pick (recommended)."),
-  timeoutMs: external_exports.number().int().min(MIN_TIMEOUT_MS).max(MAX_TIMEOUT_MS).optional().describe("Hard time budget in milliseconds, fallbacks included (default 180000). When it runs out, Gemini is stopped."),
+  timeoutMs: external_exports.number().int().min(MIN_TIMEOUT_MS).max(MAX_TIMEOUT_MS).optional().describe("Hard time budget in milliseconds, fallbacks and second pass included (default 180000, doubled with thorough). When it runs out, Gemini is stopped."),
   yolo: external_exports.boolean().optional().describe(
     "Auto-approve Gemini's own tool calls (e.g. web fetches). Default false. Gemini is still told not to edit files or run commands. Only set this if the user asks."
   )
@@ -38870,54 +39205,96 @@ async function executeAsk(ctx, args, options = {}) {
       prepareAttachments(resolved)
     ]);
     attachments = prepared;
+    const yolo = args.yolo ?? state.preferences.approvalMode === "yolo";
     const prompt = buildPrompt({
       prompt: args.prompt,
       mode,
+      goal: args.goal,
       format: args.format,
       inline: prepared.inline,
       referenced: prepared.referenced,
-      followUp: Boolean(args.followUp)
+      followUp: Boolean(args.followUp),
+      yolo
     });
-    const yolo = args.yolo ?? state.preferences.approvalMode === "yolo";
+    const chain = modelChain(state.preferences, mode, args.model);
+    const inputTokens = estimateInputTokens(prompt);
+    const timeoutMs = args.timeoutMs ?? Math.min(MAX_TIMEOUT_MS, state.preferences.timeoutMs * (args.thorough ? 2 : 1));
     const cacheTtlMs = state.preferences.cacheTtlMinutes * 6e4;
     const cacheKey = cacheTtlMs > 0 && !args.followUp && !prepared.referenced.some((file2) => file2.isDirectory) ? ResponseCache.key({
-      v: 2,
+      v: 3,
       prompt,
       model: args.model ?? null,
       yolo,
+      thorough: Boolean(args.thorough),
       refs: await fingerprints(prepared.referenced.map((file2) => file2.path))
     }) : null;
     if (cacheKey && !args.fresh) {
       const cached2 = await ctx.cache.get(cacheKey, cacheTtlMs, ctx.now());
       if (cached2) {
+        const report2 = await checkQuotes(cached2.text, prepared);
+        const caution2 = cautionFor(mode, cached2.model, [], report2);
         const charsSaved2 = Math.max(0, fileChars - cached2.text.length);
         await record2(ctx, { ...call, ok: true, engine: "cache", model: cached2.model, durationMs: elapsed(), attempts: [], attachments, charsSaved: charsSaved2 });
-        return withWarning(textResult(`${cached2.text}
-
-${cachedFooter(mode, cached2)}`), warning);
+        return withWarning(
+          textResult(compose(cached2.text, [], [...caution2 ? [caution2] : [], ...reportLines(report2), cachedFooter(mode, cached2)])),
+          warning
+        );
+      }
+    }
+    if (!options.background) {
+      const waitMs = await shortestBudgetWait(ctx, chain, args.model, inputTokens);
+      if (waitMs >= AUTO_BACKGROUND_MS) {
+        const seconds = Math.ceil(waitMs / 1e3);
+        return withWarning(
+          await startBackground(
+            ctx,
+            args,
+            `Gemini's per-minute token quota is still busy with earlier requests (about ${seconds}s to go), so this runs in the background instead of blocking you.`,
+            seconds
+          ),
+          warning
+        );
       }
     }
     options.report?.(describeAttachments(prepared));
     const heartbeat = options.report ? setInterval(() => options.report?.(`Gemini is still working\u2026 ${Math.round(elapsed() / 1e3)}s`), HEARTBEAT_MS) : void 0;
+    const request = {
+      prompt,
+      chain,
+      explicitModel: args.model,
+      timeoutMs,
+      yolo,
+      cwd,
+      includeDirectories: includeDirectoriesFor(resolved, ctx.projectDir()),
+      acpEligible: prepared.referenced.length === 0 && !yolo,
+      conversationId: args.followUp,
+      inputTokens,
+      signal: options.signal,
+      onProgress: options.report
+    };
     let outcome;
+    let passes = 1;
+    let secondPassNote = null;
+    let tokensSent;
     try {
-      outcome = await runGemini(ctx, {
-        prompt,
-        chain: modelChain(state.preferences, mode, args.model),
-        explicitModel: args.model,
-        timeoutMs: args.timeoutMs ?? state.preferences.timeoutMs,
-        yolo,
-        cwd,
-        includeDirectories: includeDirectoriesFor(resolved, ctx.projectDir()),
-        acpEligible: prepared.referenced.length === 0 && !yolo,
-        conversationId: args.followUp,
-        signal: options.signal,
-        onProgress: options.report
-      });
+      outcome = await runGemini(ctx, request);
+      tokensSent = outcome.response.inputTokens ?? inputTokens;
+      if (args.thorough) {
+        const tools = allowsTools({ followUp: Boolean(args.followUp), yolo, referenced: prepared.referenced });
+        const checkPrompt = buildSecondPassPrompt(args.goal, tools);
+        const second = await secondPass(ctx, request, outcome, checkPrompt, timeoutMs - elapsed(), options.report);
+        if (second.outcome) {
+          tokensSent += second.outcome.response.inputTokens ?? inputTokens;
+          outcome = { ...second.outcome, attempts: [...outcome.attempts, ...second.outcome.attempts] };
+          passes = 2;
+        }
+        secondPassNote = second.note;
+      }
     } finally {
       if (heartbeat) clearInterval(heartbeat);
     }
     const { response } = outcome;
+    const report = await checkQuotes(response.text, prepared);
     const charsSaved = Math.max(0, fileChars - response.text.length);
     await record2(ctx, {
       ...call,
@@ -38927,7 +39304,8 @@ ${cachedFooter(mode, cached2)}`), warning);
       durationMs: elapsed(),
       attempts: outcome.attempts,
       attachments,
-      charsSaved
+      charsSaved,
+      inputTokens: tokensSent
     });
     if (cacheKey) {
       await ctx.cache.set(cacheKey, {
@@ -38938,13 +39316,12 @@ ${cachedFooter(mode, cached2)}`), warning);
         conversationId: response.sessionId
       }).catch(() => void 0);
     }
-    const cliWarnings = response.warnings.length > 0 ? `
-
-Gemini CLI warnings:
-${response.warnings.join("\n")}` : "";
-    return withWarning(textResult(`${response.text}${cliWarnings}
-
-${answerFooter(mode, outcome, charsSaved)}`), warning);
+    const caution = cautionFor(mode, response.model, outcome.attempts, report);
+    const footer = answerFooter(mode, outcome, charsSaved, { passes, secondPassNote, confidence: parseConfidence(response.text) });
+    return withWarning(
+      textResult(compose(response.text, response.warnings, [...caution ? [caution] : [], ...reportLines(report), footer])),
+      warning
+    );
   } catch (err) {
     const error62 = asBridgeError(err);
     const attempts = Array.isArray(error62.details.attempts) ? error62.details.attempts : [];
@@ -38972,7 +39349,30 @@ ${answerFooter(mode, outcome, charsSaved)}`), warning);
     );
   }
 }
-async function startBackground(ctx, args) {
+async function secondPass(ctx, request, first, checkPrompt, remainingMs, report) {
+  if (remainingMs < MIN_SECOND_PASS_MS) return { outcome: null, note: "second pass skipped: not enough time left in the budget" };
+  const sessionId = first.response.sessionId ?? void 0;
+  report?.("Second pass: Gemini is checking its answer against the files\u2026");
+  try {
+    const outcome = await runGemini(ctx, {
+      ...request,
+      // Without a conversation to continue, the material and the draft go along again.
+      prompt: sessionId ? checkPrompt : `${request.prompt}
+
+A draft answer to check follows.
+
+${escapeAtSigns(first.response.text)}
+
+${checkPrompt}`,
+      conversationId: sessionId,
+      timeoutMs: remainingMs
+    });
+    return { outcome, note: null };
+  } catch (err) {
+    return { outcome: null, note: `second pass failed, so this is the first-pass answer: ${asBridgeError(err).message}` };
+  }
+}
+async function startBackground(ctx, args, why, expectedSeconds) {
   const state = await ctx.store.read();
   if (!state.enabled) return errorResult("disabled", "The Gemini bridge is turned off, so nothing was sent to Gemini.");
   const { missing } = await resolveInputPaths(args.paths ?? [], ctx.projectDir());
@@ -38983,8 +39383,38 @@ async function startBackground(ctx, args) {
     () => executeAsk(ctx, { ...args, background: false }, { background: true }),
     (err) => errorResult("gemini_error", asBridgeError(err).message)
   );
-  const message = `Started background Gemini job ${job.id} (${label}). Keep working; collect the answer with gemini_result({ jobId: "${job.id}", waitSeconds: 60 }).`;
+  const waitSeconds = Math.min(120, (expectedSeconds ?? 30) + 30);
+  const message = `${why ? `${why} ` : ""}Started background Gemini job ${job.id} (${label}). Keep working; collect the answer with gemini_result({ jobId: "${job.id}", waitSeconds: ${waitSeconds} }).`;
   return textResult(message, { message, jobId: job.id, status: "running" });
+}
+async function checkQuotes(answer, attachments) {
+  if (attachments.inline.length === 0 && attachments.referenced.length === 0) return null;
+  const sources = await loadSources(attachments.inline, attachments.referenced, answer);
+  return verifyCitations(answer, sources, true);
+}
+function cautionFor(mode, model, attempts, report) {
+  if (model && /lite/i.test(model) && tierFor(mode) === "strong") {
+    const passedOver = attempts.some((a) => a.outcome === "quota" || a.outcome === "unavailable");
+    return `[\u26A0 first pass: answered by ${model}, the lightest model${passedOver ? " (the stronger ones had no quota)" : ""}. Verify the key findings in the code before acting on them.]`;
+  }
+  if (report && report.problems > 0) return "[\u26A0 some quotes don't match the files (details below): double-check before relying on this answer.]";
+  return null;
+}
+function parseConfidence(answer) {
+  const match = /(?:^|\n)[\s>*_-]*Confidence[*_]*\s*:[*_\s]*(high|medium|low)\b/i.exec(answer);
+  return match ? match[1].toLowerCase() : null;
+}
+function compose(answer, warnings, trailer) {
+  const cliWarnings = warnings.length > 0 ? `
+
+Gemini CLI warnings:
+${warnings.join("\n")}` : "";
+  return `${answer}${cliWarnings}
+
+${trailer.join("\n")}`;
+}
+function reportLines(report) {
+  return report?.text ? [report.text] : [];
 }
 async function record2(ctx, call) {
   const stamp = ctx.now().toISOString();
@@ -39020,18 +39450,22 @@ async function record2(ctx, call) {
     inlineFiles: call.attachments.inline.length,
     referencedFiles: call.attachments.referenced.length,
     charsSaved: call.charsSaved,
-    background: call.background
+    background: call.background,
+    ...call.inputTokens ? { inputTokens: call.inputTokens } : {}
   }).catch(() => void 0);
 }
-function answerFooter(mode, outcome, charsSaved) {
+function answerFooter(mode, outcome, charsSaved, extras) {
   const { response, engine, attempts } = outcome;
   const tokens = Math.round(charsSaved / CHARS_PER_TOKEN);
   const parts = ["gemini-claude-bridge", mode, response.model ?? "default model", `${(response.durationMs / 1e3).toFixed(1)}s`];
   if (engine === "acp") parts.push("warm process");
+  if (extras.passes > 1) parts.push("2 passes");
+  if (extras.confidence) parts.push(`Gemini's confidence: ${extras.confidence}`);
   if (tokens > 0) parts.push(`~${tokens} tokens of file content kept out of Claude's context`);
   const lines = [`[${parts.join(" \xB7 ")}]`];
   const passedOver = attempts.filter((a) => a.outcome === "quota" || a.outcome === "unavailable");
   if (passedOver.length > 0) lines.push(`[fell back past ${passedOver.map((a) => `${a.model} (${a.detail})`).join("; ")}]`);
+  if (extras.secondPassNote) lines.push(`[${extras.secondPassNote}]`);
   if (response.sessionId) lines.push(`[followUp: "${response.sessionId}"]`);
   return lines.join("\n");
 }
@@ -39125,7 +39559,7 @@ function registerResultTool(server, ctx) {
 }
 
 // src/tools/status.ts
-var STATUS_DESCRIPTION = "Report whether the Gemini bridge is on, whether the gemini CLI is installed and signed in, which models are cooling down after running out of quota, recent speed and usage (calls, errors, cache hits, estimated context saved) and current preferences. Use it when the user asks whether the bridge or Gemini is on, set up or working. Works even while the bridge is off.";
+var STATUS_DESCRIPTION = "Report whether the Gemini bridge is on, whether the gemini CLI is installed and signed in, what is missing from the setup (with the commands to fix it), which models are cooling down after running out of quota, per-minute token limits, recent speed and usage, and current preferences. Use it when the user asks whether the bridge or Gemini is on, set up or working. Works even while the bridge is off.";
 var statusInputSchema = {
   forceRefresh: external_exports.boolean().optional().describe("Re-check the Gemini CLI install and sign-in now instead of reusing the last check (cached up to 10 minutes).")
 };
@@ -39135,23 +39569,30 @@ async function handleStatus(ctx, args) {
   const state = await ctx.store.read();
   const now = ctx.now();
   const week = summarizeHistory(await ctx.history.recent(new Date(now.getTime() - WEEK_MS)));
-  const cooldowns = activeCooldowns(state, now);
-  const summary = formatStatus({
+  const lastMinute = {};
+  for (const spend of await recentSpends(ctx)) lastMinute[spend.model] = (lastMinute[spend.model] ?? 0) + spend.tokens;
+  const input2 = {
     state,
     cli,
     week,
     now,
     stateFile: ctx.store.file,
     engine: ctx.acp ? ctx.acp.describe() : "not available",
-    runningJobs: ctx.jobs.running()
-  });
+    runningJobs: ctx.jobs.running(),
+    lastMinute,
+    platform: process.platform,
+    nodeVersion: process.versions.node
+  };
+  const summary = formatStatus(input2);
   const usage = { ...state.usage, estimatedTokensSaved: Math.round(state.usage.estimatedCharsSaved / CHARS_PER_TOKEN) };
   return withWarning(
     textResult(summary, {
       summary,
       enabled: state.enabled,
+      setup: setupItems(input2),
       geminiCli: cli,
-      cooldowns,
+      cooldowns: activeCooldowns(state, now),
+      modelLimits: state.modelLimits,
       last7Days: week,
       usage,
       preferences: state.preferences,
@@ -39160,9 +39601,13 @@ async function handleStatus(ctx, args) {
     ctx.store.takeWarning()
   );
 }
-function formatStatus({ state, cli, week, now, stateFile, engine, runningJobs }) {
+function formatStatus(input2) {
+  const { state, cli, week, now, stateFile, engine, runningJobs } = input2;
   const lines = [`Gemini bridge: ${state.enabled ? "ON" : "OFF"}`];
   const p = state.preferences;
+  const setup = setupItems(input2);
+  lines.push(setup.length === 0 ? "Setup: all set" : `Setup: ${setup.length} thing(s) to fix:
+${setup.map((item) => `  - ${item}`).join("\n")}`);
   if (cli.installed) {
     const version2 = cli.version && cli.version !== "unknown" ? ` v${cli.version}` : " (version unknown)";
     const ripgrep = cli.ripgrep ? ` \xB7 ripgrep: ${cli.ripgrep.available ? "yes" : `no (${cli.ripgrep.detail})`}` : "";
@@ -39170,7 +39615,7 @@ function formatStatus({ state, cli, week, now, stateFile, engine, runningJobs })
     const auth = cli.authOk === true ? "OK" : cli.authOk === false ? "NOT signed in" : "unknown";
     lines.push(`Sign-in: ${auth}${cli.authDetail ? ` (${cli.authDetail})` : ""}`);
   } else {
-    lines.push("Gemini CLI: NOT FOUND on PATH. Install it with `npm install -g @google/gemini-cli`, then restart Claude Code.");
+    lines.push("Gemini CLI: NOT FOUND on PATH.");
   }
   lines.push(`Engine: ${p.engine} (warm process: ${engine})`);
   lines.push(
@@ -39180,6 +39625,12 @@ function formatStatus({ state, cli, week, now, stateFile, engine, runningJobs })
   lines.push(
     cooling.length > 0 ? `Cooling down: ${cooling.map((c) => `${c.model} (${c.reason}; until ${shortTime(c.until)})`).join("; ")}` : "Cooling down: none"
   );
+  const limits = Object.entries(state.modelLimits);
+  if (limits.length > 0) {
+    lines.push(
+      `Per-minute input-token limits (learned from Google's quota errors): ${limits.map(([model, l]) => `${model} ${compact(l.inputTokensPerMinute)}/min, ~${compact(input2.lastMinute?.[model] ?? 0)} used in the last minute`).join("; ")}`
+    );
+  }
   if (week.calls > 0) {
     const models = Object.entries(week.byModel).map(([model, s]) => `${model} ${s.ok} ok${s.failed ? `/${s.failed} failed` : ""}${s.ok ? ` avg ${(s.avgMs / 1e3).toFixed(1)}s` : ""}`).join("; ");
     lines.push(
@@ -39198,6 +39649,33 @@ function formatStatus({ state, cli, week, now, stateFile, engine, runningJobs })
   );
   lines.push(`State file: ${stateFile}${cli.checkedAt ? ` (CLI last checked ${cli.checkedAt})` : ""}`);
   return lines.join("\n");
+}
+function setupItems({ cli, platform = process.platform, nodeVersion = process.versions.node }) {
+  const items = [];
+  if (Number(nodeVersion.split(".")[0]) < 20) {
+    items.push(`Node.js ${nodeVersion} is too old for the Gemini CLI: install Node 20 or newer (${nodeInstall(platform)}), then restart Claude Code.`);
+  }
+  if (!cli.installed) {
+    items.push("The Gemini CLI is missing: run `npm install -g @google/gemini-cli`, then restart Claude Code.");
+  } else if (cli.authOk === false) {
+    items.push(`Gemini isn't signed in: ${cli.authDetail ?? "run `gemini` once in a terminal and sign in with Google."}`);
+  }
+  if (cli.installed && cli.ripgrep && !cli.ripgrep.available) {
+    items.push(`Optional, for faster searches: install ripgrep ${ripgrepInstall(platform)}.`);
+  }
+  return items;
+}
+function nodeInstall(platform) {
+  if (platform === "win32") return "`winget install OpenJS.NodeJS.LTS`";
+  if (platform === "darwin") return "`brew install node`";
+  return "your package manager or https://nodejs.org";
+}
+function ripgrepInstall(platform) {
+  if (platform === "win32") {
+    return "machine-wide, from an administrator terminal: `winget install --id BurntSushi.ripgrep.MSVC --scope machine` (the Gemini CLI ignores a per-user install)";
+  }
+  if (platform === "darwin") return "with `brew install ripgrep`";
+  return "with `sudo apt install ripgrep` (or your distribution's package manager)";
 }
 function activeCooldowns(state, now) {
   return Object.entries(state.modelCooldowns).filter(([, c]) => Date.parse(c.until) > now.getTime()).map(([model, c]) => ({ model, ...c }));
@@ -39259,8 +39737,10 @@ function registerToggleTool(server, ctx) {
 var SERVER_NAME = "gemini-claude-bridge";
 var INSTRUCTIONS = [
   "Gemini bridge: delegate self-contained subtasks to Google Gemini (through the user's local gemini CLI) to save your own context and tokens.",
-  "- gemini_ask: for summarizing or analyzing large files and logs, many files, broad codebase questions, second-opinion reviews, drafting boilerplate/tests/docs, and plans. Put the files in `paths` instead of reading them yourself, and say in `format` exactly what you need back. Run independent tasks as parallel calls; for long ones pass background: true and collect them with gemini_result while you keep working. Before relying on a specific line or value Gemini cites, read just those lines. Gemini only returns text; you make any edits. Do small or conversation-dependent tasks yourself.",
-  '- When the user asks to turn the Gemini bridge (or Gemini delegation) on or off, in any language (e.g. "apag\xE1 el bridge"), call gemini_bridge_toggle. When they ask whether it is on or working, call gemini_bridge_status.'
+  '- Delegate the reading, not the thinking: use gemini_ask to get facts, locations and exact quotes out of large files, logs or many files (e.g. "every place user input reaches a SQL query, with the line"), then make the judgments yourself. Put the files in `paths` instead of reading them, say in `goal` what the answer is for and in `format` what you need back.',
+  "- The bridge checks Gemini's file:line quotes against the files and flags mismatches, and marks judgment answers from the lightest model as a first pass. Verify what you rely on (read just the cited lines) and use thorough: true for decisions that matter. Gemini only returns text; you make any edits.",
+  "- Run independent tasks as parallel calls; long ones with background: true, collected with gemini_result. Do small or conversation-dependent tasks yourself.",
+  '- When the user asks to turn the Gemini bridge (or Gemini delegation) on or off, in any language (e.g. "apag\xE1 el bridge"), call gemini_bridge_toggle. When they ask whether it is on or working, call gemini_bridge_status; /gemini-claude-bridge:setup walks them through fixing the setup.'
 ].join("\n");
 function createServer(ctx = createContext()) {
   const server = new McpServer({ name: SERVER_NAME, version: VERSION }, { instructions: INSTRUCTIONS });

@@ -3,6 +3,7 @@ import path from "node:path";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { ResponseCache } from "../../src/cache.js";
 import type { BridgeContext, WarmEngine } from "../../src/context.js";
+import { SpendLedger } from "../../src/gemini/budget.js";
 import { classifyFailure, type GeminiRequest, type GeminiResponse } from "../../src/gemini/invoke.js";
 import { runGemini, type RunRequest } from "../../src/gemini/runner.js";
 import { History } from "../../src/history.js";
@@ -53,6 +54,7 @@ beforeEach(async () => {
     cache: new ResponseCache(path.join(root, "cache")),
     history: new History(path.join(root, "history.jsonl")),
     jobs: new JobManager(),
+    spend: new SpendLedger(),
     refreshCli: vi.fn(),
     projectDir: () => root,
     scratchDir: async () => root,
@@ -161,6 +163,44 @@ describe("runGemini", () => {
     await runGemini(ctx, request());
     expect(ctx.acp.run).not.toHaveBeenCalled();
     expect(invoke).toHaveBeenCalledTimes(2);
+  });
+
+  it("tries a model whose per-minute token budget is busy only after the others", async () => {
+    await ctx.store.update((s) => {
+      s.modelLimits.pro = { inputTokensPerMinute: 250_000, learnedAt: "2026-09-10T11:00:00.000Z" };
+    });
+    await ctx.history.append({
+      at: "2026-09-10T11:59:40.000Z",
+      mode: "ask",
+      ok: true,
+      engine: "cli",
+      model: "pro",
+      durationMs: 1,
+      attempts: [{ model: "pro", outcome: "ok", ms: 1 }],
+      inlineFiles: 1,
+      referencedFiles: 0,
+      charsSaved: 0,
+      background: false,
+      inputTokens: 200_000,
+    });
+    const progress: string[] = [];
+    await runGemini(ctx, request({ acpEligible: false, inputTokens: 100_000, onProgress: (m) => progress.push(m) }));
+
+    expect(invoke.mock.calls[0]![0].model).toBe("flash");
+    expect(progress[0]).toBe("pro's per-minute token quota is busy for ~40s; trying flash first…");
+  });
+
+  it("learns a model's per-minute token limit from its quota error", async () => {
+    invoke.mockRejectedValueOnce(
+      classifyFailure(
+        1,
+        "You exceeded your current quota",
+        undefined,
+        "* Quota exceeded for metric: generate_content_free_tier_input_token_count, limit: 250000, model: x\nPlease retry in 5s.",
+      ),
+    );
+    await runGemini(ctx, request({ acpEligible: false }));
+    expect((await ctx.store.read()).modelLimits.pro?.inputTokensPerMinute).toBe(250_000);
   });
 
   it("resumes a follow-up with the CLI when the warm process no longer holds it", async () => {

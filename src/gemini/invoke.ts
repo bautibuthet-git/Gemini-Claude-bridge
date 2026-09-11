@@ -3,6 +3,7 @@ import crossSpawn from "cross-spawn";
 import treeKill from "tree-kill";
 import { BridgeError, errorMessage, isErrnoException } from "../util/errors.js";
 import { getEnv, withAugmentedPath } from "../util/paths.js";
+import { parseTokenLimit } from "./budget.js";
 import { isModelUnavailable, isTransient, parseQuota } from "./models.js";
 
 export type SpawnFn = (command: string, args: readonly string[], options: SpawnOptions) => ChildProcess;
@@ -186,6 +187,8 @@ export interface GeminiRequest {
   failFast?: boolean;
   /** Told when the CLI starts waiting out a rate limit, so the wait isn't silent. */
   onNotice?: (message: string) => void;
+  /** Told the per-minute input-token limit when Google's quota message states it. */
+  onLimit?: (inputTokensPerMinute: number) => void;
 }
 
 export interface GeminiResponse {
@@ -196,6 +199,8 @@ export interface GeminiResponse {
   warnings: string[];
   /** Gemini's session id: pass it back as a follow-up to continue the conversation. */
   sessionId: string | null;
+  /** Input tokens Gemini reports having read, when it does (for the per-minute budget). */
+  inputTokens?: number | null;
 }
 
 export interface InvokeDeps {
@@ -262,6 +267,8 @@ export async function invokeGemini(req: GeminiRequest, deps: InvokeDeps = {}): P
     if (!noticed && RETRY_WAIT_PATTERN.test(recentStderr)) {
       noticed = true;
       req.onNotice?.(describeWait(recentStderr));
+      const limit = parseTokenLimit(recentStderr);
+      if (limit) req.onLimit?.(limit);
     }
     return null;
   };
@@ -289,7 +296,7 @@ export async function invokeGemini(req: GeminiRequest, deps: InvokeDeps = {}): P
 interface GeminiJson {
   session_id?: unknown;
   response?: unknown;
-  stats?: { models?: Record<string, { tokens?: { candidates?: number; total?: number } }> };
+  stats?: { models?: Record<string, { tokens?: { candidates?: number; total?: number; prompt?: number } }> };
   error?: { type?: string; message?: string; code?: number | string };
   warnings?: unknown;
 }
@@ -326,7 +333,15 @@ export function interpretResult(r: RunResult, timeoutMs: number): GeminiResponse
   // after printing it (a libuv assertion in src\win\async.c, exit 127) — which would otherwise
   // read as "not installed" and throw a good answer away.
   if (typeof json?.response === "string" && json.response.trim() && !json.error) {
-    return { text: json.response.trim(), model: primaryModel(json.stats), durationMs: r.durationMs, exitCode, warnings, sessionId };
+    return {
+      text: json.response.trim(),
+      model: primaryModel(json.stats),
+      durationMs: r.durationMs,
+      exitCode,
+      warnings,
+      sessionId,
+      inputTokens: promptTokens(json.stats),
+    };
   }
 
   // Stopped on purpose by the watcher: classify from everything read so far.
@@ -380,7 +395,13 @@ export function classifyFailure(exitCode: number, message: string, geminiErrorTy
   }
   const quota = parseQuota(haystack);
   if (quota) {
-    return new BridgeError("quota", `Gemini quota or rate limit reached: ${message}`, { ...details, failure: "quota", quota });
+    const tokenLimit = parseTokenLimit(haystack);
+    return new BridgeError("quota", `Gemini quota or rate limit reached: ${message}`, {
+      ...details,
+      failure: "quota",
+      quota,
+      ...(tokenLimit ? { tokenLimit } : {}),
+    });
   }
   if (isModelUnavailable(haystack)) {
     return new BridgeError("gemini_error", `This Gemini model is not available: ${message}`, {
@@ -436,6 +457,14 @@ function tryParseObject(text: string): GeminiJson | null {
   } catch {
     return null;
   }
+}
+
+/** Input tokens across every model the call used (routing may add a small one). */
+function promptTokens(stats: GeminiJson["stats"]): number | null {
+  const counts = Object.values(stats?.models ?? {})
+    .map((info) => info?.tokens?.prompt)
+    .filter((n): n is number => typeof n === "number");
+  return counts.length > 0 ? counts.reduce((a, b) => a + b, 0) : null;
 }
 
 /** The model that produced the most output (routing may also call a small model). */

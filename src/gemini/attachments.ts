@@ -17,6 +17,8 @@ export interface InlineFile {
   lines: number;
   /** Numbered, at-sign-escaped content, ready to paste into the prompt. */
   text: string;
+  /** The original lines, for checking Gemini's quotes against the file afterwards. */
+  raw?: string[];
 }
 
 export interface ReferencedFile {
@@ -49,7 +51,7 @@ export async function prepareAttachments(
     const file = await readText(target.absolute, remaining);
     if (file.kind === "text") {
       const numbered = numberLines(file.content);
-      inline.push({ path: target.absolute, lines: numbered.lines, text: numbered.text });
+      inline.push({ path: target.absolute, ...numbered });
       remaining -= Buffer.byteLength(numbered.text, "utf8");
     } else {
       const lines = file.kind === "too_big" ? await countLines(target.absolute) : null;
@@ -71,10 +73,16 @@ async function readText(file: string, budget: number): Promise<ReadOutcome> {
   return { kind: "text", content: content.charCodeAt(0) === 0xfeff ? content.slice(1) : content };
 }
 
-/** "N: line" per line, so Gemini can cite exact line numbers; at-signs are escaped for the CLI. */
-export function numberLines(content: string): { text: string; lines: number } {
-  if (content === "") return { text: "", lines: 0 };
+/** Lines of a text file, without the empty entry a trailing newline would add. */
+export function splitLines(content: string): string[] {
+  if (content === "") return [];
   const lines = content.split(/\r?\n/);
   if (lines.length > 1 && lines[lines.length - 1] === "") lines.pop();
-  return { text: lines.map((line, i) => `${i + 1}: ${escapeAtSigns(line)}`).join("\n"), lines: lines.length };
+  return lines;
+}
+
+/** "N: line" per line, so Gemini can cite exact line numbers; at-signs are escaped for the CLI. */
+export function numberLines(content: string): { text: string; lines: number; raw: string[] } {
+  const raw = splitLines(content);
+  return { text: raw.map((line, i) => `${i + 1}: ${escapeAtSigns(line)}`).join("\n"), lines: raw.length, raw };
 }

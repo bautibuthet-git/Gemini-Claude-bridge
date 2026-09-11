@@ -2,6 +2,7 @@ import fs from "node:fs/promises";
 import path from "node:path";
 import { ResponseCache } from "./cache.js";
 import { AcpEngine, type AcpRunRequest } from "./gemini/acp.js";
+import { SpendLedger } from "./gemini/budget.js";
 import { refreshCliStatus, type CliStatus } from "./gemini/detect.js";
 import { invokeGemini, type GeminiRequest, type GeminiResponse } from "./gemini/invoke.js";
 import { History } from "./history.js";
@@ -28,6 +29,8 @@ export interface BridgeContext {
   cache: ResponseCache;
   history: History;
   jobs: JobManager;
+  /** Input tokens of calls in flight in this process, for the per-minute budget. */
+  spend: SpendLedger;
   refreshCli(force: boolean): Promise<CliStatus>;
   /** The project Claude is working in (base for relative paths, readable by Gemini). */
   projectDir(): string;
@@ -51,6 +54,7 @@ export function createContext(store: StateStore = new StateStore()): BridgeConte
     cache: new ResponseCache(path.join(home, "cache")),
     history: new History(path.join(home, "history.jsonl")),
     jobs: new JobManager(),
+    spend: new SpendLedger(),
     refreshCli: (force) => refreshCliStatus(store, { force }),
     projectDir: () => workspaceRoot(),
     scratchDir,

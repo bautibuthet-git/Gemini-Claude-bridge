@@ -6,16 +6,18 @@ import type { CallToolResult } from "@modelcontextprotocol/sdk/types.js";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { ResponseCache } from "../../src/cache.js";
 import type { BridgeContext } from "../../src/context.js";
+import { SpendLedger } from "../../src/gemini/budget.js";
 import type { CliStatus } from "../../src/gemini/detect.js";
 import { classifyFailure, type GeminiRequest, type GeminiResponse } from "../../src/gemini/invoke.js";
-import { FOLLOW_UP_HEADER, toAtReference } from "../../src/gemini/promptBuilder.js";
-import { History } from "../../src/history.js";
+import { ANSWER_RULES, FOLLOW_UP_HEADER, toAtReference } from "../../src/gemini/promptBuilder.js";
+import { History, summarizeHistory, type HistoryEntry } from "../../src/history.js";
 import { JobManager } from "../../src/jobs.js";
 import { createServer } from "../../src/server.js";
+import { defaultState } from "../../src/state/schema.js";
 import { StateStore } from "../../src/state/store.js";
-import { handleAsk } from "../../src/tools/ask.js";
+import { handleAsk, parseConfidence } from "../../src/tools/ask.js";
 import { handleResult } from "../../src/tools/jobs.js";
-import { handleStatus } from "../../src/tools/status.js";
+import { formatStatus, handleStatus } from "../../src/tools/status.js";
 import { handleToggle } from "../../src/tools/toggle.js";
 import { BridgeError } from "../../src/util/errors.js";
 import { tempDir } from "../helpers.js";
@@ -32,10 +34,12 @@ const CLI: CliStatus = {
 };
 const SESSION = "11111111-2222-3333-4444-555555555555";
 const ANSWER: GeminiResponse = { text: "Gemini says hi", model: "main-model", durationMs: 1234, exitCode: 0, warnings: [], sessionId: SESSION };
+const ERROR_LINE = "2026-09-10T10:57:00Z ERROR db.pool: connection refused to 10.0.0.12:5432";
 
 let root: string;
 let project: string;
 let bigFile: string;
+let logFile: string;
 let ctx: BridgeContext;
 let invoke: ReturnType<typeof vi.fn<(req: GeminiRequest) => Promise<GeminiResponse>>>;
 let refreshCli: ReturnType<typeof vi.fn<(force: boolean) => Promise<CliStatus>>>;
@@ -47,8 +51,10 @@ beforeEach(async () => {
   root = await tempDir("gcb-tools-");
   project = path.join(root, "project");
   bigFile = path.join(project, "src", "big file.ts");
+  logFile = path.join(project, "build.log");
   await fs.mkdir(path.dirname(bigFile), { recursive: true });
   await fs.writeFile(bigFile, Array.from({ length: 1000 }, (_, i) => `const line${i} = ${i}; // padding padding padding`).join("\n"));
+  await fs.writeFile(logFile, ["INFO start", ERROR_LINE, "INFO end"].join("\n"));
 
   invoke = vi.fn(async () => ({ ...ANSWER }));
   refreshCli = vi.fn(async () => CLI);
@@ -60,6 +66,7 @@ beforeEach(async () => {
     cache: new ResponseCache(path.join(state, "cache")),
     history: new History(path.join(state, "history.jsonl")),
     jobs: new JobManager(),
+    spend: new SpendLedger(),
     refreshCli,
     projectDir: () => project,
     scratchDir: async () => {
@@ -91,7 +98,10 @@ describe("gemini_ask", () => {
     expect(req.includeDirectories).toEqual([project]);
 
     const text = textOf(result);
-    expect(text).toMatch(/^Gemini says hi\n\n\[gemini-claude-bridge · summarize · main-model · 1\.2s · ~\d+ tokens of file content kept out of Claude's context\]/);
+    expect(text.startsWith("Gemini says hi\n\n")).toBe(true);
+    // An answer about attached files that quotes nothing checkable is flagged as unverified.
+    expect(text).toContain("[no quotes the bridge could check against the files: treat the claims above as unverified]");
+    expect(text).toMatch(/\[gemini-claude-bridge · summarize · main-model · 1\.2s · ~\d+ tokens of file content kept out of Claude's context\]/);
     expect(text).toContain(`[followUp: "${SESSION}"]`);
     // Claude Code shows the model structuredContent INSTEAD of the text, so a successful answer
     // must not carry one, or Gemini's answer would never reach Claude.
@@ -101,8 +111,108 @@ describe("gemini_ask", () => {
     expect(state.usage).toMatchObject({ totalCalls: 1, totalErrors: 0, callsByMode: { summarize: 1 } });
     expect(state.geminiCli.lastAuthOk).toBe(true);
     expect(await ctx.history.recent(new Date(0))).toEqual([
-      expect.objectContaining({ mode: "summarize", ok: true, engine: "cli", inlineFiles: 1, referencedFiles: 0 }),
+      expect.objectContaining({ mode: "summarize", ok: true, engine: "cli", inlineFiles: 1, referencedFiles: 0, inputTokens: expect.any(Number) }),
     ]);
+  });
+
+  it("passes the goal on and asks for evidence, coverage and confidence", async () => {
+    await handleAsk(ctx, { prompt: "What failed?", paths: [logFile], goal: "decide whether the export needs a retry" });
+    const prompt = invoke.mock.calls[0]![0].prompt;
+    expect(prompt).toContain("Purpose (what the answer will be used for): decide whether the export needs a retry.");
+    expect(prompt).toContain(ANSWER_RULES);
+  });
+
+  it("checks Gemini's quotes against the file and shows the real text of a misquoted line", async () => {
+    invoke.mockResolvedValueOnce({ ...ANSWER, text: "The export failed: build.log:2 `2026-09-10T10:58:00Z ERROR db.pool: connection refused`" });
+    const text = textOf(await handleAsk(ctx, { prompt: "What failed?", paths: [logFile] }));
+    expect(text).toContain("[⚠ some quotes don't match the files (details below): double-check before relying on this answer.]");
+    expect(text).toContain("[quotes checked by the bridge against the files: 0 exact · 1 misquoted]");
+    expect(text).toContain("the file says `2026-09-10T10:57:00Z ERROR db.pool");
+  });
+
+  it("confirms exact quotes quietly", async () => {
+    invoke.mockResolvedValueOnce({ ...ANSWER, text: `The export failed: build.log:2 \`${ERROR_LINE}\`` });
+    const text = textOf(await handleAsk(ctx, { prompt: "What failed?", paths: [logFile] }));
+    expect(text).toContain("[quotes checked by the bridge against the files: 1 exact]");
+    expect(text).not.toContain("⚠");
+  });
+
+  it("marks a review answered by the lightest model as a first pass, cached or not", async () => {
+    invoke.mockResolvedValueOnce({ ...ANSWER, model: "gemini-3.1-flash-lite" });
+    const text = textOf(await handleAsk(ctx, { prompt: "Review", paths: [bigFile], mode: "review" }));
+    expect(text).toContain("[⚠ first pass: answered by gemini-3.1-flash-lite, the lightest model. Verify the key findings in the code before acting on them.]");
+    const cached = textOf(await handleAsk(ctx, { prompt: "Review", paths: [bigFile], mode: "review" }));
+    expect(cached).toMatch(/cached answer from/);
+    expect(cached).toContain("[⚠ first pass: answered by gemini-3.1-flash-lite, the lightest model.");
+  });
+
+  it("surfaces Gemini's own confidence in the footer", async () => {
+    invoke.mockResolvedValueOnce({ ...ANSWER, text: "Answer.\n\nCoverage: all of it\nConfidence: low, the log is ambiguous" });
+    expect(textOf(await handleAsk(ctx, { prompt: "x" }))).toContain("· Gemini's confidence: low");
+    expect(parseConfidence("**Confidence:** High — clear evidence")).toBe("high");
+    expect(parseConfidence("no such line")).toBeNull();
+  });
+
+  it("thorough: a second pass checks the first answer in the same conversation", async () => {
+    invoke
+      .mockResolvedValueOnce({ ...ANSWER, text: "draft", inputTokens: 1_000 })
+      .mockResolvedValueOnce({ ...ANSWER, text: "corrected answer", inputTokens: 3_000 });
+    const text = textOf(await handleAsk(ctx, { prompt: "Review", paths: [logFile], mode: "review", thorough: true, goal: "ship or not" }));
+
+    expect(invoke).toHaveBeenCalledTimes(2);
+    // Two passes get twice the default time budget.
+    expect(invoke.mock.calls[0]![0].timeoutMs).toBe(360_000);
+    const second = invoke.mock.calls[1]![0];
+    expect(second.resumeSessionId).toBe(SESSION);
+    expect(second.prompt.startsWith("Second pass")).toBe(true);
+    expect(second.prompt).toContain("for the purpose (ship or not)");
+    expect(text.startsWith("corrected answer")).toBe(true);
+    expect(text).toContain("· 2 passes");
+    // Both passes count against the per-minute token budget.
+    expect((await ctx.history.recent(new Date(0)))[0]).toMatchObject({ inputTokens: 4_000 });
+  });
+
+  it("thorough without a conversation to continue sends the material again with the draft", async () => {
+    invoke.mockResolvedValueOnce({ ...ANSWER, text: "draft", sessionId: null }).mockResolvedValueOnce({ ...ANSWER, text: "corrected" });
+    await handleAsk(ctx, { prompt: "Review", paths: [logFile], thorough: true });
+    const second = invoke.mock.calls[1]![0];
+    expect(second.resumeSessionId).toBeUndefined();
+    expect(second.prompt).toContain("===== FILE 1 of 1:");
+    expect(second.prompt).toContain("A draft answer to check follows.\n\ndraft");
+  });
+
+  it("keeps the first answer, and says so, when the second pass fails", async () => {
+    invoke.mockResolvedValueOnce({ ...ANSWER, text: "first answer" }).mockRejectedValueOnce(new BridgeError("timeout", "too slow"));
+    const text = textOf(await handleAsk(ctx, { prompt: "x", paths: [logFile], thorough: true }));
+    expect(text.startsWith("first answer")).toBe(true);
+    expect(text).toContain("[second pass failed, so this is the first-pass answer: too slow]");
+  });
+
+  it("runs in the background when the per-minute token quota would make it wait", async () => {
+    const busy = (model: string): HistoryEntry => ({
+      at: "2026-09-10T11:59:50.000Z",
+      mode: "ask",
+      ok: true,
+      engine: "cli",
+      model,
+      durationMs: 1,
+      attempts: [{ model, outcome: "ok", ms: 1 }],
+      inlineFiles: 1,
+      referencedFiles: 0,
+      charsSaved: 0,
+      background: false,
+      inputTokens: 240_000,
+    });
+    await ctx.store.update((s) => {
+      for (const model of s.preferences.models.fast) s.modelLimits[model] = { inputTokensPerMinute: 250_000, learnedAt: "x" };
+    });
+    for (const model of defaultState().preferences.models.fast) await ctx.history.append(busy(model));
+
+    const result = await handleAsk(ctx, { prompt: "Summarize", paths: [bigFile] });
+    expect(textOf(result)).toMatch(/per-minute token quota is still busy with earlier requests \(about 50s to go\), so this runs in the background/);
+    const jobId = (result.structuredContent as { jobId: string }).jobId;
+    const done = await handleResult(ctx, { jobId, waitSeconds: 5 });
+    expect(textOf(done)).toContain("Gemini says hi");
   });
 
   it("resolves relative paths against the project folder", async () => {
@@ -172,7 +282,7 @@ describe("gemini_ask", () => {
     await handleAsk(ctx, { prompt: "Summarize", paths: [bigFile] });
     const second = await handleAsk(ctx, { prompt: "Summarize", paths: [bigFile] });
     expect(invoke).toHaveBeenCalledTimes(1);
-    expect(textOf(second)).toMatch(/^Gemini says hi\n\n\[gemini-claude-bridge · ask · cached answer from/);
+    expect(textOf(second)).toMatch(/\[gemini-claude-bridge · ask · cached answer from/);
     expect((await ctx.store.read()).usage.cacheHits).toBe(1);
 
     await handleAsk(ctx, { prompt: "Summarize", paths: [bigFile], fresh: true });
@@ -244,25 +354,47 @@ describe("gemini_bridge_toggle", () => {
 });
 
 describe("gemini_bridge_status", () => {
-  it("covers on/off, CLI, ripgrep, sign-in, models, cooldowns, speed and usage", async () => {
+  it("covers setup, CLI, ripgrep, sign-in, models, cooldowns, limits, speed and usage", async () => {
     await handleAsk(ctx, { prompt: "x", paths: [bigFile], mode: "review" });
     await ctx.store.update((s) => {
       s.modelCooldowns.pro = { until: "2026-09-11T07:00:00.000Z", reason: "daily quota used up" };
       s.modelCooldowns.old = { until: "2026-09-01T00:00:00.000Z", reason: "expired" };
+      s.modelLimits["gemini-3.1-flash-lite"] = { inputTokensPerMinute: 250_000, learnedAt: "2026-09-10T11:00:00.000Z" };
     });
     const result = await handleStatus(ctx, { forceRefresh: true });
     const text = textOf(result);
 
     expect(refreshCli).toHaveBeenCalledWith(true);
-    expect(text).toMatch(/Gemini bridge: ON/);
+    expect(text).toMatch(/Gemini bridge: ON\nSetup: all set/);
     expect(text).toMatch(/Gemini CLI: installed v0\.59\.0 at C:\\bin\\gemini\.cmd · ripgrep: yes/);
     expect(text).toMatch(/Sign-in: OK/);
     expect(text).toMatch(/Models: fast tasks gemini-3\.1-flash-lite → flash → auto; strong tasks pro → flash → gemini-3\.1-flash-lite/);
     expect(text).toMatch(/Cooling down: pro \(daily quota used up; until 2026-09-11 07:00Z\)$/m);
+    expect(text).toMatch(/Per-minute input-token limits \(learned from Google's quota errors\): gemini-3\.1-flash-lite 250\.0k\/min/);
     // The test clock stands still, so durations are 0 and the overall average is left out.
     expect(text).toMatch(/Last 7 days: 1 call \(1 ok, 0 cached, 0 failed\); pro 1 ok avg 0\.0s/);
     expect(text).toMatch(/Usage: 1 call, 0 errors \(review 1\); 0 cache hits;/);
-    expect(result.structuredContent).toMatchObject({ enabled: true, usage: { totalCalls: 1 }, summary: expect.stringContaining("Gemini bridge: ON") });
+    expect(result.structuredContent).toMatchObject({ enabled: true, setup: [], usage: { totalCalls: 1 }, summary: expect.stringContaining("Gemini bridge: ON") });
+  });
+
+  it("lists what's missing from the setup with the command for the user's system", () => {
+    const base = {
+      state: defaultState(),
+      week: summarizeHistory([]),
+      now: new Date(),
+      stateFile: "state.json",
+      engine: "idle",
+      runningJobs: 0,
+      nodeVersion: "22.1.0",
+    };
+    const noRipgrep: CliStatus = { ...CLI, ripgrep: { available: false, path: null, detail: "not installed" } };
+    expect(formatStatus({ ...base, cli: noRipgrep, platform: "win32" })).toContain("winget install --id BurntSushi.ripgrep.MSVC --scope machine");
+    expect(formatStatus({ ...base, cli: noRipgrep, platform: "darwin" })).toContain("brew install ripgrep");
+    expect(formatStatus({ ...base, cli: noRipgrep, platform: "linux" })).toContain("sudo apt install ripgrep");
+    const missing = formatStatus({ ...base, cli: { ...CLI, installed: false }, platform: "linux", nodeVersion: "18.19.0" });
+    expect(missing).toContain("Setup: 2 thing(s) to fix:");
+    expect(missing).toContain("Node.js 18.19.0 is too old");
+    expect(missing).toContain("npm install -g @google/gemini-cli");
   });
 
   it("works while the bridge is off", async () => {
@@ -288,9 +420,24 @@ describe("MCP server", () => {
     const ask = tools.find((t) => t.name === "gemini_ask")!;
     expect(ask.inputSchema.required).toEqual(["prompt"]);
     const props = ask.inputSchema.properties as Record<string, { maxItems?: number; enum?: string[] }>;
-    expect(Object.keys(props).sort()).toEqual(["background", "followUp", "format", "fresh", "mode", "model", "paths", "prompt", "timeoutMs", "yolo"]);
+    expect(Object.keys(props).sort()).toEqual([
+      "background",
+      "followUp",
+      "format",
+      "fresh",
+      "goal",
+      "mode",
+      "model",
+      "paths",
+      "prompt",
+      "thorough",
+      "timeoutMs",
+      "yolo",
+    ]);
     expect(props.paths?.maxItems).toBe(20);
     expect(props.mode?.enum).toEqual(["ask", "summarize", "analyze", "review", "refactor", "plan", "test"]);
+    expect(ask.description).toMatch(/Delegate the reading, not the thinking/);
+    expect(client.getInstructions()).toMatch(/Delegate the reading, not the thinking/);
     expect(client.getInstructions()).toMatch(/gemini_bridge_toggle/);
     await client.close();
   });

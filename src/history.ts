@@ -17,6 +17,8 @@ export interface HistoryEntry {
   referencedFiles: number;
   charsSaved: number;
   background: boolean;
+  /** Input tokens sent to Gemini (as reported, else estimated), for the per-minute budget. */
+  inputTokens?: number;
 }
 
 /** One JSON line per call, trimmed to the most recent entries so it never grows unbounded. */

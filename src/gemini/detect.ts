@@ -73,6 +73,8 @@ export function detectRipgrep(
   cliPath: string | null,
   env: NodeJS.ProcessEnv = process.env,
   platform: NodeJS.Platform = process.platform,
+  /** Also look in the standard install folders, as the bridge does when it launches Gemini. */
+  augment = true,
 ): RipgrepStatus {
   const binary = `rg-${platform}-${process.arch}${platform === "win32" ? ".exe" : ""}`;
   if (cliPath) {
@@ -81,7 +83,7 @@ export function detectRipgrep(
       if (fs.existsSync(candidate)) return { available: true, path: candidate, detail: "bundled with the Gemini CLI" };
     }
   }
-  const found = findOnPath("rg", withAugmentedPath(env, platform), platform);
+  const found = findOnPath("rg", augment ? withAugmentedPath(env, platform) : env, platform);
   if (!found) return { available: false, path: null, detail: "not installed, so Gemini's searches use a slower built-in grep" };
   let real = found;
   try {
@@ -142,9 +144,17 @@ export function detectAuth(env: NodeJS.ProcessEnv = process.env): AuthCheck {
         };
   }
   if (method === "gemini-api-key") {
-    return getEnv(env, "GEMINI_API_KEY")
-      ? { ok: true, method, detail: "Using the GEMINI_API_KEY environment variable." }
-      : { ok: null, method, detail: "API-key sign-in is selected; the key may come from a .env file. The next Gemini call will confirm." };
+    if (getEnv(env, "GEMINI_API_KEY")) return { ok: true, method, detail: "Using the GEMINI_API_KEY environment variable." };
+    // The CLI also reads ~/.gemini/.env and ~/.env. Only the key's presence is checked, never its value.
+    const envFile = [path.join(dir, ".env"), path.join(path.dirname(dir), ".env")].find((file) => hasDotEnvKey(file, "GEMINI_API_KEY"));
+    return envFile
+      ? { ok: true, method, detail: `Using the API key in ${envFile}.` }
+      : {
+          ok: null,
+          method,
+          detail:
+            "API-key sign-in is selected, but no GEMINI_API_KEY was found in the environment or ~/.gemini/.env. If calls fail, put GEMINI_API_KEY=<key> in ~/.gemini/.env (keys: https://aistudio.google.com/apikey).",
+        };
   }
   return { ok: null, method, detail: `Auth method "${method}" is configured. The next Gemini call will confirm it works.` };
 }
@@ -227,6 +237,19 @@ function authTypeFromEnv(env: NodeJS.ProcessEnv): string | null {
     return "compute-default-credentials";
   }
   return null;
+}
+
+/** Whether a .env file sets `key` to something that isn't empty or an obvious placeholder. */
+function hasDotEnvKey(file: string, key: string): boolean {
+  let text: string;
+  try {
+    text = fs.readFileSync(file, "utf8");
+  } catch {
+    return false;
+  }
+  const line = text.split(/\r?\n/).find((l) => new RegExp(`^\\s*(?:export\\s+)?${key}\\s*=`).test(l));
+  const value = line ? line.slice(line.indexOf("=") + 1).trim().replace(/^["']|["']$/g, "") : "";
+  return value.length > 0 && !/^(PEGA_TU_KEY_ACA|your[-_ ]?(api[-_ ]?)?key.*|<.*>|x+)$/i.test(value);
 }
 
 function readJsonc(file: string): unknown {

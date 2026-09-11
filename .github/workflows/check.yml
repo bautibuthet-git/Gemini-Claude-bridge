@@ -1,0 +1,26 @@
+# Typecheck, unit tests, build and the stdio smoke test (a fake `gemini` in both the one-shot
+# and the warm ACP mode) on Windows, Linux and macOS. The Gemini CLI itself is never called.
+name: check
+
+on:
+  push:
+    paths-ignore: ["**.md"]
+  pull_request:
+  workflow_dispatch:
+
+jobs:
+  check:
+    name: ${{ matrix.os }}
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [windows-latest, ubuntu-latest, macos-latest]
+    runs-on: ${{ matrix.os }}
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+      - run: npm install --no-audit --no-fund
+      - run: npm run check

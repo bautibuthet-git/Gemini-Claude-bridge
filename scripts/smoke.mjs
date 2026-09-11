@@ -46,6 +46,7 @@ if (args.includes("--version")) {
       const input = m.params.prompt.map((p) => p.text).join("");
       const sessionId = m.params.sessionId;
       logCall({ engine: "acp", sessionId, input });
+      send({ jsonrpc: "2.0", method: "session/update", params: { sessionId, update: { sessionUpdate: "tool_call", toolCallId: "t1", status: "completed", kind: "read", title: "sample file.txt" } } });
       send({ jsonrpc: "2.0", method: "session/update", params: { sessionId, update: { sessionUpdate: "agent_message_chunk", content: { type: "text", text: "warm fake gemini got " + input.split("\\n").length + " lines" } } } });
       return send({ jsonrpc: "2.0", id: m.id, result: { stopReason: "end_turn", _meta: { quota: { model_usage: [{ model: "fake-acp-model" }] } } } });
     }
@@ -166,6 +167,7 @@ try {
   check(Boolean(warm[0]?.input.includes("===== FILE 1 of 1:") && warm[0].input.includes("200: line 200")), "file sent complete and numbered, not as an @reference");
   check(Boolean(warm[0]?.input.includes("contact: me\\@example.com")), "at-signs inside file content are escaped for the CLI");
   check(progress.some((m) => m.startsWith("Sending 1 file(s)")), `progress notifications: ${progress.join(" | ")}`);
+  check(progress.includes("Gemini is reading sample file.txt…"), "the files Gemini reads show up as progress");
 
   r = await ask(a, { prompt: "A different question", paths: [sample] });
   const starts = calls().filter((c) => c.engine === "acp-start");
@@ -198,7 +200,9 @@ try {
   check(!r.isError && /^fake gemini got/.test(textOf(r)), `one-off round trip: ${textOf(r).split("\n")[0]}`);
   check(Boolean(call?.input.includes("200: line 200")) && !call.input.includes(`@"${sample}"`), "one-off call also gets the file inline");
   check(Boolean(call?.args.includes("--skip-trust") && call.args.includes(`--include-directories=${project}`)), "headless args, project folder readable");
-  check(path.resolve(call?.cwd ?? "") === path.resolve(tmp, "home-b", "workspace"), "Gemini ran from the bridge's scratch folder");
+  // realpath: on macOS the temp folder is a symlink (/var → /private/var), and cwd reports the target.
+  const realpath = (p) => fs.realpathSync.native(p);
+  check(realpath(call?.cwd ?? ".") === realpath(path.join(tmp, "home-b", "workspace")), "Gemini ran from the bridge's scratch folder");
 
   r = await ask(b, { prompt: "What's in here?", paths: [docs] });
   call = calls().at(-1);

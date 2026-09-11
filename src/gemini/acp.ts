@@ -3,6 +3,7 @@ import crossSpawn from "cross-spawn";
 import treeKill from "tree-kill";
 import { BridgeError, errorMessage } from "../util/errors.js";
 import { VERSION } from "../version.js";
+import { parseTokenLimit } from "./budget.js";
 import {
   classifyFailure,
   describeWait,
@@ -32,6 +33,8 @@ const UNHEALTHY_MS = 5 * 60_000;
 const MAX_SESSIONS = 20;
 /** Once stderr shows a fatal model error, keep reading briefly: its details ("limit: 0") follow. */
 const WATCH_GRACE_MS = 600;
+/** Tool calls worth a progress notice, by ACP tool kind; Gemini's own bookkeeping tools are left out. */
+const TOOL_VERBS: Record<string, string> = { read: "reading", search: "searching", fetch: "fetching" };
 
 type Json = Record<string, unknown>;
 
@@ -49,6 +52,7 @@ class AcpConnection {
   private readonly pending = new Map<number, { resolve: (value: Json) => void; reject: (error: Error) => void }>();
   private buffer = "";
   private readonly chunks = new Map<string, string[]>();
+  private readonly activity = new Map<string, (message: string) => void>();
   private readonly stderrListeners = new Set<(chunk: string) => void>();
   closed: Error | null = null;
   stderrTail = "";
@@ -88,13 +92,16 @@ class AcpConnection {
     return () => this.stderrListeners.delete(listener);
   }
 
-  collect(sessionId: string): void {
+  /** Starts collecting a session's answer; `onActivity` hears about the files Gemini reads and searches. */
+  collect(sessionId: string, onActivity?: (message: string) => void): void {
     this.chunks.set(sessionId, []);
+    if (onActivity) this.activity.set(sessionId, onActivity);
   }
 
   takeText(sessionId: string): string {
     const text = (this.chunks.get(sessionId) ?? []).join("");
     this.chunks.delete(sessionId);
+    this.activity.delete(sessionId);
     return text;
   }
 
@@ -147,9 +154,15 @@ class AcpConnection {
 
   private onNotification(method: string, params: Json): void {
     if (method !== "session/update") return;
-    const update = params.update as { sessionUpdate?: string; content?: { type?: string; text?: unknown } } | undefined;
+    const sessionId = String(params.sessionId);
+    const update = params.update as
+      | { sessionUpdate?: string; content?: { type?: string; text?: unknown }; kind?: unknown; title?: unknown }
+      | undefined;
     if (update?.sessionUpdate === "agent_message_chunk" && typeof update.content?.text === "string") {
-      this.chunks.get(String(params.sessionId))?.push(update.content.text);
+      this.chunks.get(sessionId)?.push(update.content.text);
+    } else if (update?.sessionUpdate === "tool_call" && typeof update.title === "string") {
+      const verb = TOOL_VERBS[String(update.kind)];
+      if (verb) this.activity.get(sessionId)?.(`Gemini is ${verb} ${clip(update.title)}…`);
     }
   }
 
@@ -183,8 +196,10 @@ export interface AcpRunRequest {
   sessionId?: string;
   /** Abandon the prompt as soon as stderr shows a quota or unknown-model error. */
   failFast?: boolean;
-  /** Told when the CLI starts waiting out a rate limit. */
+  /** Progress notices: a rate-limit wait, the files Gemini reads and searches. */
   onNotice?: (message: string) => void;
+  /** Told the per-minute input-token limit when Google's quota message states it. */
+  onLimit?: (inputTokensPerMinute: number) => void;
 }
 
 export interface AcpDeps {
@@ -251,9 +266,14 @@ export class AcpEngine {
       this.sessions.set(sessionId, this.now());
       if (req.model !== "auto") await connection.request("session/set_model", { sessionId, modelId: req.model });
 
-      connection.collect(sessionId);
-      const result = await this.prompt(connection, sessionId, req.prompt, deadline, req);
-      const text = connection.takeText(sessionId).trim();
+      connection.collect(sessionId, req.onNotice);
+      let result: Json;
+      let text: string;
+      try {
+        result = await this.prompt(connection, sessionId, req.prompt, deadline, req);
+      } finally {
+        text = connection.takeText(sessionId).trim();
+      }
       const stopReason = typeof result.stopReason === "string" ? result.stopReason : "end_turn";
       if (stopReason === "refusal") throw new BridgeError("gemini_error", "Gemini refused to answer this request.");
       if (!text) throw new BridgeError("gemini_error", `Gemini returned an empty response (stop reason: ${stopReason}).`);
@@ -264,6 +284,7 @@ export class AcpEngine {
         exitCode: 0,
         warnings: stopReason === "end_turn" ? [] : [`The answer may be incomplete (stop reason: ${stopReason}).`],
         sessionId,
+        inputTokens: inputTokensUsed(result),
       };
     } catch (err) {
       if (err instanceof BridgeError) throw err;
@@ -387,6 +408,8 @@ export class AcpEngine {
         } else if (!req.failFast && !noticed && RETRY_WAIT_PATTERN.test(recentStderr)) {
           noticed = true;
           req.onNotice?.(describeWait(recentStderr));
+          const limit = parseTokenLimit(recentStderr);
+          if (limit) req.onLimit?.(limit);
         }
       });
       const onAbort = () => stop(new BridgeError("gemini_error", "The request was cancelled and Gemini was told to stop."));
@@ -448,6 +471,12 @@ export class AcpEngine {
   }
 }
 
+function inputTokensUsed(result: Json): number | null {
+  const count = (result._meta as { quota?: { token_count?: { input_tokens?: unknown } } } | undefined)?.quota?.token_count
+    ?.input_tokens;
+  return typeof count === "number" ? count : null;
+}
+
 function modelUsed(result: Json): string | null {
   const usage = (result._meta as { quota?: { model_usage?: Array<{ model?: unknown }> } } | undefined)?.quota?.model_usage;
   const model = usage?.[usage.length - 1]?.model;
@@ -460,6 +489,11 @@ function withTimeout<T>(promise: Promise<T>, ms: number, message: string): Promi
     timer = setTimeout(() => reject(new Error(message)), ms);
   });
   return Promise.race([promise, timeout]).finally(() => clearTimeout(timer));
+}
+
+function clip(text: string, max = 120): string {
+  const oneLine = text.replace(/\s+/g, " ").trim();
+  return oneLine.length > max ? `${oneLine.slice(0, max - 1)}…` : oneLine;
 }
 
 function lastLine(text: string): string {

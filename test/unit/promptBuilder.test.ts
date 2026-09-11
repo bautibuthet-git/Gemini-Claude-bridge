@@ -1,8 +1,10 @@
 import { describe, expect, it } from "vitest";
 import { numberLines } from "../../src/gemini/attachments.js";
 import {
+  ANSWER_RULES,
   ATTACHED_LINE_LIMIT,
   buildPrompt,
+  buildSecondPassPrompt,
   escapeAtSigns,
   fileReferenceLine,
   FOLLOW_UP_HEADER,
@@ -10,6 +12,8 @@ import {
   INLINE_INTRO,
   MODE_PREFIXES,
   toAtReference,
+  TOOLS_ALLOWED,
+  TOOLS_DISCOURAGED,
   TRUNCATION_NOTICE,
 } from "../../src/gemini/promptBuilder.js";
 import { MODES } from "../../src/state/schema.js";
@@ -64,12 +68,50 @@ describe("escapeAtSigns", () => {
 describe("buildPrompt", () => {
   it("opens with a header, so the input can never start with a Gemini CLI command", () => {
     const prompt = buildPrompt({ prompt: "  /help me  ", mode: "ask" });
-    expect(prompt).toBe(`Task:\n\n/help me\n\n${GUARDRAIL}`);
+    expect(prompt).toBe(`Task:\n\n/help me\n\n${ANSWER_RULES}\n\n${TOOLS_DISCOURAGED}\n\n${GUARDRAIL}`);
     for (const mode of MODES) expect(buildPrompt({ prompt: "$x", mode }).startsWith(MODE_PREFIXES[mode])).toBe(true);
   });
 
   it("adds the requested answer format", () => {
     expect(buildPrompt({ prompt: "x", mode: "ask", format: "5 bullets" })).toContain("\n\nAnswer format: 5 bullets\n\n");
+  });
+
+  it("tells Gemini what the answer is for", () => {
+    expect(buildPrompt({ prompt: "x", mode: "summarize", goal: "decide whether to retry the export" })).toContain(
+      "Purpose (what the answer will be used for): decide whether to retry the export. Keep everything that matters for this purpose",
+    );
+  });
+
+  it("asks every mode, follow-ups included, for evidence, coverage and confidence", () => {
+    for (const mode of MODES) expect(buildPrompt({ prompt: "x", mode })).toContain(ANSWER_RULES);
+    expect(buildPrompt({ prompt: "x", mode: "ask", followUp: true })).toContain(ANSWER_RULES);
+    expect(ANSWER_RULES).toMatch(/file:line followed by that line in backticks/);
+    expect(ANSWER_RULES).toMatch(/"Coverage:".*"Confidence:"/s);
+  });
+
+  it("keeps Gemini off its tools when everything is attached, and allows them when it must fetch material", () => {
+    const inline = [{ path: "C:\\a.ts", ...numberLines("const a = 1;\n") }];
+    expect(buildPrompt({ prompt: "x", mode: "review", inline })).toContain(TOOLS_DISCOURAGED);
+    expect(buildPrompt({ prompt: "x", mode: "ask" })).toContain(TOOLS_DISCOURAGED);
+    const allowed = [
+      buildPrompt({ prompt: "x", mode: "review", referenced: [{ path: "C:\\dir", lines: null, isDirectory: true }] }),
+      buildPrompt({ prompt: "x", mode: "review", followUp: true }),
+      buildPrompt({ prompt: "x", mode: "review", yolo: true }),
+    ];
+    for (const prompt of allowed) {
+      expect(prompt).toContain(TOOLS_ALLOWED);
+      expect(prompt).not.toContain(TOOLS_DISCOURAGED);
+    }
+    expect(buildSecondPassPrompt(undefined, true)).toContain(TOOLS_ALLOWED);
+    expect(buildSecondPassPrompt()).toContain(TOOLS_DISCOURAGED);
+  });
+
+  it("builds a second pass that re-checks the answer against the purpose", () => {
+    const second = buildSecondPassPrompt("pick the safest fix");
+    expect(second.startsWith("Second pass")).toBe(true);
+    expect(second).toContain("for the purpose (pick the safest fix)");
+    expect(second).toContain("Is every quote exact and at the line you cited");
+    expect(second.endsWith(GUARDRAIL)).toBe(true);
   });
 
   it("inlines files between markers, complete and numbered, with at-signs escaped", () => {

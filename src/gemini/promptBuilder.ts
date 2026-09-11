@@ -7,34 +7,62 @@ export { escapeAtSigns, toAtReference };
 /**
  * Every prompt opens with a fixed header. Besides framing the task, it guarantees the input
  * never starts with "/" or "$", which the Gemini CLI would take for one of its own commands.
+ * The framing asks for what the material shows, tied to the exact lines, rather than for
+ * verdicts: Claude only ever sees this answer, so a shallow reading would otherwise become
+ * Claude's picture of the file.
  */
 export const MODE_PREFIXES: Record<Mode, string> = {
   ask: "Task:",
   summarize:
     "Summary task. Report the key facts and anything that looks wrong, most important first. For logs: whether the run succeeded, and every error or warning with its line number and timestamp. For documents: the main points and decisions.",
   analyze:
-    "Analysis task. Examine the provided material and explain what matters in it: for code, its structure, responsibilities, data flow and notable design decisions; for logs or data, what happened and what stands out. Be concrete and cite specific files, lines or timestamps.",
+    "Analysis task. Explain what matters in the material: for code, its structure, responsibilities, data flow and notable design decisions; for logs or data, what happened and what stands out.",
   review:
-    "Critical code review. Report only problems you can point to in the code: file, line, what is wrong, why it matters and a concrete fix. Rank them critical (bugs, security), major or minor. Skip praise, style nitpicks and generic advice.",
+    "Critical code review. List only problems you can point to in the code, most severe first: the location and exact code, what is wrong, why it matters, a concrete fix, and how sure you are. Rank them critical (bugs, security), major or minor. Leave out style nitpicks, generic advice and anything you cannot show in the code.",
   refactor:
-    "Refactoring proposal. Suggest behavior-preserving improvements to structure, naming, duplication, clarity and performance. Show the proposed code and briefly justify each change. Do not apply the changes yourself.",
-  plan: "Implementation planning. Produce a concise, ordered plan: the files to create or change, what changes in each, risks, and open questions.",
-  test: "Test design. Propose test cases covering the happy path, edge cases and failure modes, and write the test code using the project's existing test framework and conventions where visible.",
+    "Refactoring proposal. Suggest behavior-preserving improvements to structure, naming, duplication, clarity and performance, each tied to the exact code it changes. Show the proposed code and briefly justify each change. Do not apply the changes yourself.",
+  plan: "Implementation planning. Produce a concise, ordered plan: the files to create or change and the exact code each change touches, risks, and open questions.",
+  test: "Test design. Propose test cases covering the happy path, edge cases and failure modes, each tied to the code it exercises, and write the test code using the project's existing test framework and conventions where visible.",
 };
 
 export const FOLLOW_UP_HEADER = "Follow-up question about the material and answer above:";
 
 /**
+ * Evidence, coverage and confidence, in a shape the bridge can check: every `file:line` quote is
+ * compared with the real file afterwards, and the Confidence line is surfaced to Claude.
+ */
+export const ANSWER_RULES = [
+  "How to answer:",
+  "- Back every factual claim and finding with evidence: the file name, the line number and the exact text, written as file:line followed by that line in backticks, for example: app.ts:42 `const total = price * qty;`. Copy quoted text character for character.",
+  "- Report what the material shows. Leave final decisions to the reader; when you do judge something, say how sure you are.",
+  "- If the material is not enough to answer well, say what is missing instead of guessing.",
+  '- End with two lines: "Coverage:" what you read fully, partly or not at all; and "Confidence:" high, medium or low, with the reason.',
+].join("\n");
+
+/**
  * Appended to every prompt: Gemini stays text-out and read-only; Claude is the only one that
- * edits. Reading has to be allowed explicitly — a blanket "do not run tools" made Gemini refuse
- * to read the rest of a file and answer from half of it. Citations let Claude check claims
- * cheaply. The answer lands in Claude's context (Claude Code caps tool results at ~25k tokens),
+ * edits. The answer lands in Claude's context (Claude Code caps tool results at ~25k tokens),
  * hence the concision.
  */
 export const GUARDRAIL =
-  "Respond in plain text only (Markdown and code blocks are fine). Use your read-only tools freely — reading files, listing and searching — but change nothing: no file edits, no writes, no shell commands. " +
-  "Cite file names and line numbers for specific claims so they can be checked. " +
+  "Respond in plain text only (Markdown and code blocks are fine). Change nothing: no file edits, no writes, no shell commands. " +
   "Be concise: your answer is read by another AI assistant with a limited context window.";
+
+/**
+ * For material Gemini has to fetch itself (referenced files and folders, an earlier conversation,
+ * yolo). Reading has to be allowed explicitly: a blanket "do not run tools" made Gemini refuse
+ * to read the rest of a file and answer from half of it.
+ */
+export const TOOLS_ALLOWED =
+  "Use your read-only tools freely (reading files, listing, searching) when the task needs material that is not in this conversation.";
+
+/**
+ * For material attached complete. Invited to use tools anyway, flash re-read an attached file
+ * and browsed unrelated project files: a review of a 20-line file took three model round trips,
+ * 47k input tokens and 47s, and another ran past the 180s budget.
+ */
+export const TOOLS_DISCOURAGED =
+  "Everything you need is in this conversation, and attached files are complete: answer directly, without using tools to re-read attachments or to explore other files.";
 
 /** The Gemini CLI attaches only this many lines of each `@path` file (its DEFAULT_MAX_LINES_TEXT_FILE). */
 export const ATTACHED_LINE_LIMIT = 2000;
@@ -67,19 +95,29 @@ export function fileReferenceLine(file: PromptFile, platform: NodeJS.Platform = 
 export interface PromptInput {
   prompt: string;
   mode: Mode;
+  /** What the answer will be used for; lets Gemini keep what matters for that decision. */
+  goal?: string;
   /** What Claude needs back, e.g. "5 bullets" or "only issues as file:line — problem — fix". */
   format?: string;
   inline?: readonly InlineFile[];
   referenced?: readonly (ReferencedFile | PromptFile)[];
   /** Continues an earlier conversation, whose history already holds the files. */
   followUp?: boolean;
+  /** Gemini's tool calls are auto-approved (e.g. web fetches the user asked for). */
+  yolo?: boolean;
   platform?: NodeJS.Platform;
+}
+
+/** Gemini needs its tools only for material it must fetch itself: referenced items, an earlier conversation, or yolo. */
+export function allowsTools(input: Pick<PromptInput, "followUp" | "yolo" | "referenced">): boolean {
+  return Boolean(input.followUp || input.yolo || (input.referenced?.length ?? 0) > 0);
 }
 
 export function buildPrompt(input: PromptInput): string {
   const inline = input.inline ?? [];
   const referenced = input.referenced ?? [];
   const sections = [input.followUp ? FOLLOW_UP_HEADER : MODE_PREFIXES[input.mode], escapeAtSigns(input.prompt.trim())];
+  if (input.goal?.trim()) sections.push(purposeLine(input.goal));
   if (input.format?.trim()) sections.push(`Answer format: ${escapeAtSigns(input.format.trim())}`);
   if (inline.length > 0) sections.push(inlineSection(inline));
   if (referenced.length > 0) {
@@ -91,8 +129,31 @@ export function buildPrompt(input: PromptInput): string {
       ].join("\n"),
     );
   }
-  sections.push(GUARDRAIL);
+  sections.push(ANSWER_RULES, allowsTools(input) ? TOOLS_ALLOWED : TOOLS_DISCOURAGED, GUARDRAIL);
   return sections.join("\n\n");
+}
+
+/**
+ * The optional second pass (thorough: true), sent as a follow-up in the same conversation:
+ * Gemini checks its own answer against the material and returns a corrected one.
+ */
+export function buildSecondPassPrompt(goal?: string, allowTools = false): string {
+  const purpose = goal?.trim() ? ` for the purpose (${escapeAtSigns(goal.trim())})` : "";
+  return [
+    "Second pass: check your previous answer against the material before it is used.",
+    [
+      "- Is every quote exact and at the line you cited, and does it really support the claim?",
+      `- What did you miss that matters${purpose}?`,
+      "- What did you get wrong, overstate, or leave without evidence?",
+    ].join("\n"),
+    "Then write the corrected final answer in full, in the same format, ending with the Coverage and Confidence lines. Output only that final answer, not a list of your changes.",
+    allowTools ? TOOLS_ALLOWED : TOOLS_DISCOURAGED,
+    GUARDRAIL,
+  ].join("\n\n");
+}
+
+function purposeLine(goal: string): string {
+  return `Purpose (what the answer will be used for): ${escapeAtSigns(goal.trim())}. Keep everything that matters for this purpose, and say plainly if the material cannot support it.`;
 }
 
 function inlineSection(files: readonly InlineFile[]): string {
