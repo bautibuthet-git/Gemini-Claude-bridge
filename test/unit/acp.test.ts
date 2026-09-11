@@ -1,5 +1,5 @@
 import { describe, expect, it, vi } from "vitest";
-import { AcpEngine } from "../../src/gemini/acp.js";
+import { AcpEngine, silenceLimitMs, type AcpDeps } from "../../src/gemini/acp.js";
 import { BridgeError } from "../../src/util/errors.js";
 import { fakeKill, fakeSpawn, type FakeChild } from "../helpers.js";
 
@@ -17,6 +17,8 @@ interface AgentOptions {
   promptStderr?: string;
   /** Tool calls reported before the answer. */
   toolCalls?: Array<{ kind: string; title: string }>;
+  /** Stream thoughts for this long (ms) before answering. */
+  thinkFor?: number;
 }
 
 /** A scripted `gemini --acp`: answers the protocol over the fake child's stdio. */
@@ -71,22 +73,34 @@ function fakeAgent(options: AgentOptions = {}) {
         if (options.promptStderr) current?.stderr.write(options.promptStderr);
         if (options.hang) return;
         const sessionId = m.params?.sessionId;
-        if (options.askPermission) {
-          send({
-            jsonrpc: "2.0",
-            id: 99,
-            method: "session/request_permission",
-            params: { sessionId, options: [{ optionId: "yes", kind: "allow_once" }, { optionId: "no", kind: "reject_once" }], toolCall: {} },
-          });
-        }
-        for (const tool of options.toolCalls ?? []) {
-          send({ jsonrpc: "2.0", method: "session/update", params: { sessionId, update: { sessionUpdate: "tool_call", toolCallId: tool.title, status: "in_progress", ...tool } } });
-        }
-        for (const text of ["Hello ", "world"]) {
-          send({ jsonrpc: "2.0", method: "session/update", params: { sessionId, update: { sessionUpdate: "agent_message_chunk", content: { type: "text", text } } } });
-        }
-        send({ jsonrpc: "2.0", method: "session/update", params: { sessionId, update: { sessionUpdate: "agent_thought_chunk", content: { type: "text", text: "(thinking)" } } } });
-        send({ jsonrpc: "2.0", id: m.id, result: { stopReason: "end_turn", _meta: { quota: { model_usage: [{ model: "gemini-3.1-flash-lite" }] } } } });
+        const thought = () =>
+          send({ jsonrpc: "2.0", method: "session/update", params: { sessionId, update: { sessionUpdate: "agent_thought_chunk", content: { type: "text", text: "(thinking)" } } } });
+        const answer = () => {
+          if (options.askPermission) {
+            send({
+              jsonrpc: "2.0",
+              id: 99,
+              method: "session/request_permission",
+              params: { sessionId, options: [{ optionId: "yes", kind: "allow_once" }, { optionId: "no", kind: "reject_once" }], toolCall: {} },
+            });
+          }
+          for (const tool of options.toolCalls ?? []) {
+            send({ jsonrpc: "2.0", method: "session/update", params: { sessionId, update: { sessionUpdate: "tool_call", toolCallId: tool.title, status: "in_progress", ...tool } } });
+          }
+          for (const text of ["Hello ", "world"]) {
+            send({ jsonrpc: "2.0", method: "session/update", params: { sessionId, update: { sessionUpdate: "agent_message_chunk", content: { type: "text", text } } } });
+          }
+          thought();
+          send({ jsonrpc: "2.0", id: m.id, result: { stopReason: "end_turn", _meta: { quota: { model_usage: [{ model: "gemini-3.1-flash-lite" }] } } } });
+        };
+        if (!options.thinkFor) return answer();
+        const until = Date.now() + options.thinkFor;
+        const tick = setInterval(() => {
+          thought();
+          if (Date.now() < until) return;
+          clearInterval(tick);
+          answer();
+        }, 40);
         return;
       }
       case "session/cancel":
@@ -98,10 +112,10 @@ function fakeAgent(options: AgentOptions = {}) {
   return { attach, received, permissionAnswers };
 }
 
-function engineWith(agent: ReturnType<typeof fakeAgent>) {
+function engineWith(agent: ReturnType<typeof fakeAgent>, overrides: Partial<AcpDeps> = {}) {
   const { spawn, calls, children } = fakeSpawn((child) => agent.attach(child));
   const { kill, kills } = fakeKill((pid) => children.find((c) => c.pid === pid)?.emit("close", null, "SIGKILL"));
-  const engine = new AcpEngine({ cwd: async () => "C:\\scratch", projectDir: () => "C:\\project", spawn, kill, command: "gemini" });
+  const engine = new AcpEngine({ cwd: async () => "C:\\scratch", projectDir: () => "C:\\project", spawn, kill, command: "gemini", ...overrides });
   return { engine, calls, children, kills };
 }
 
@@ -192,6 +206,31 @@ describe("AcpEngine", () => {
     expect(result.text).toBe("Hello world");
     expect(notices).toEqual(["Gemini is reading src\\app.ts…", "Gemini is searching src…"]);
     engine.close();
+  });
+
+  it("gives up on a prompt with no sign of life, so the call can ask again with a one-off process", async () => {
+    const agent = fakeAgent({ hang: true });
+    const { engine } = engineWith(agent, { silenceMs: () => 50 });
+    const error = (await engine.run({ prompt: "x", model: "flash", timeoutMs: 5_000 }).catch((e: unknown) => e)) as BridgeError;
+    expect(error.details.failure).toBe("engine");
+    expect(error.message).toMatch(/^flash gave no sign of life for 0s in the warm Gemini process/);
+    expect(agent.received.some((m) => m.method === "session/cancel")).toBe(true);
+    // Only this prompt was stuck: the engine stays available to other calls.
+    expect(engine.isHealthy()).toBe(true);
+    engine.close();
+  });
+
+  it("keeps waiting while Gemini shows signs of life, however long it thinks", async () => {
+    const { engine } = engineWith(fakeAgent({ thinkFor: 300 }), { silenceMs: () => 150 });
+    const result = await engine.run({ prompt: "x", model: "flash", timeoutMs: 5_000 });
+    expect(result.text).toBe("Hello world");
+    engine.close();
+  });
+
+  it("allows bigger prompts a longer silence before the first sign of life", () => {
+    expect(silenceLimitMs(2_500)).toBe(40_500);
+    expect(silenceLimitMs(250_000)).toBe(90_000);
+    expect(silenceLimitMs(5_000_000)).toBe(120_000);
   });
 
   it("cancels a prompt that runs out of time", async () => {

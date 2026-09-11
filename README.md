@@ -160,7 +160,7 @@ Esto importa porque Claude solo ve la respuesta de Gemini. Si Gemini hace una le
 5. **Presupuesto por minuto.** El bridge aprende el tope de tokens por minuto de cada modelo del propio error de Google y lleva la cuenta de lo enviado.
    - Si mandar ahora un archivo grande obligaría a esperar, prueba primero otro modelo.
    - Si todos tendrían que esperar 20 s o más, la llamada pasa sola a segundo plano y Claude sigue trabajando.
-6. **Un proceso persistente atiende la mayoría de las llamadas.** Gemini corre como un proceso `gemini --acp` que queda prendido. Cada llamada es una sesión nueva y una repregunta reutiliza la suya. Cualquier permiso que pida Gemini se rechaza. Las llamadas con referencias `@` o `yolo` usan en cambio un proceso `gemini` por llamada:
+6. **Un proceso persistente atiende la mayoría de las llamadas.** Gemini corre como un proceso `gemini --acp` que queda prendido. Cada llamada es una sesión nueva y una repregunta reutiliza la suya. Cualquier permiso que pida Gemini se rechaza. Si un modelo no da ninguna señal de vida en ~40 s (así se queda en ese proceso cuando se le terminó la cuota diaria, sin avisar), se le vuelve a preguntar con un proceso por llamada, que sí informa el error. Las llamadas con referencias `@` o `yolo` usan en cambio un proceso `gemini` por llamada:
    - Con `--output-format json --skip-trust --approval-mode=default`.
    - Con el pedido por stdin, porque cmd.exe corta los argumentos en el primer salto de línea.
    - Desde una carpeta vacía propia del bridge, sumando las carpetas necesarias con `--include-directories`.
@@ -193,7 +193,7 @@ Medido en Windows con una API key gratuita:
 
 Con una key gratuita:
 
-- `pro` no tiene cuota, y `flash` da unos 20 pedidos por día. Las cadenas lo manejan solas, y `gemini_bridge_status` muestra qué modelos están en espera y hasta cuándo.
+- `pro` no tiene cuota, y `flash` da unos 20 pedidos por día. Las cadenas lo manejan solas, y `gemini_bridge_status` muestra qué modelos están en espera y hasta cuándo. Si `flash` agota su cuota diaria en medio de una llamada, esa llamada pierde ~40 s en darse cuenta; las siguientes lo saltean hasta la medianoche del Pacífico.
 - `flash-lite` tiene un **tope de 250.000 tokens de entrada por minuto**. Un log de 4.000 líneas se come buena parte, y preguntar dos veces por él dentro del mismo minuto hacía esperar 64 s al CLI. Ahora el bridge ve venir esa espera: usa otro modelo o pasa la llamada a segundo plano. Una repregunta reenvía la conversación (archivo incluido), así que también cuenta.
 - El modelo más liviano puede equivocarse en detalles (copió `10:58` en vez de `10:57`) o exagerar en una revisión. Para eso están la verificación de citas, la marca de "primera pasada", la confianza declarada y `thorough`.
 

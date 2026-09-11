@@ -121,7 +121,7 @@ export async function runGemini(ctx: BridgeContext, req: RunRequest): Promise<Ru
       if (failure === "engine") {
         attempts.push({ model, engine, outcome: "engine", ms, detail: error.message });
         useAcp = false; // same model again, as a one-off process
-        req.onProgress?.("The warm Gemini process is unavailable; using a one-off process.");
+        req.onProgress?.(`${error.message.replace(/[.\s]+$/, "")}; asking again with a one-off process…`);
         continue;
       }
 

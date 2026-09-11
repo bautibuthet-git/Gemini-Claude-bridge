@@ -35,6 +35,18 @@ const MAX_SESSIONS = 20;
 const WATCH_GRACE_MS = 600;
 /** Tool calls worth a progress notice, by ACP tool kind; Gemini's own bookkeeping tools are left out. */
 const TOOL_VERBS: Record<string, string> = { read: "reading", search: "searching", fetch: "fetching" };
+/**
+ * In the warm process, a model whose daily quota is used up never answers: no error, no update,
+ * nothing, while a one-off CLI reports the same error in ~4s. A prompt that shows no sign of life
+ * (no thought, text or tool call) for this long is abandoned, so the call can ask the same model
+ * again with a one-off process. Bigger prompts take longer to start: +1s per 5,000 characters.
+ */
+const SILENCE_BASE_MS = 40_000;
+const SILENCE_MAX_MS = 120_000;
+
+export function silenceLimitMs(promptChars: number): number {
+  return Math.min(SILENCE_MAX_MS, SILENCE_BASE_MS + Math.round(promptChars / 5));
+}
 
 type Json = Record<string, unknown>;
 
@@ -53,6 +65,7 @@ class AcpConnection {
   private buffer = "";
   private readonly chunks = new Map<string, string[]>();
   private readonly activity = new Map<string, (message: string) => void>();
+  private readonly alive = new Map<string, () => void>();
   private readonly stderrListeners = new Set<(chunk: string) => void>();
   closed: Error | null = null;
   stderrTail = "";
@@ -105,6 +118,12 @@ class AcpConnection {
     return text;
   }
 
+  /** `listener` runs on every update for the session: any sign that Gemini is working on it. */
+  onUpdate(sessionId: string, listener: () => void): () => void {
+    this.alive.set(sessionId, listener);
+    return () => this.alive.delete(sessionId);
+  }
+
   /** Kills the whole process tree; `done` runs once the kill has been carried out. */
   kill(kill: KillFn, done: () => void = () => undefined): void {
     if (this.child.pid !== undefined && !this.closed) kill(this.child.pid, "SIGKILL", () => done());
@@ -155,6 +174,7 @@ class AcpConnection {
   private onNotification(method: string, params: Json): void {
     if (method !== "session/update") return;
     const sessionId = String(params.sessionId);
+    this.alive.get(sessionId)?.();
     const update = params.update as
       | { sessionUpdate?: string; content?: { type?: string; text?: unknown }; kind?: unknown; title?: unknown }
       | undefined;
@@ -212,6 +232,8 @@ export interface AcpDeps {
   spawn?: SpawnFn;
   kill?: KillFn;
   now?: () => number;
+  /** How long a prompt of this many characters may show no sign of life (default: silenceLimitMs). */
+  silenceMs?: (promptChars: number) => number;
 }
 
 export class AcpEngine {
@@ -225,11 +247,13 @@ export class AcpEngine {
   private readonly spawnFn: SpawnFn;
   private readonly killFn: KillFn;
   private readonly now: () => number;
+  private readonly silenceMs: (promptChars: number) => number;
 
   constructor(private readonly deps: AcpDeps) {
     this.spawnFn = deps.spawn ?? (crossSpawn as unknown as SpawnFn);
     this.killFn = deps.kill ?? (treeKill as KillFn);
     this.now = deps.now ?? Date.now;
+    this.silenceMs = deps.silenceMs ?? silenceLimitMs;
   }
 
   isHealthy(): boolean {
@@ -372,12 +396,15 @@ export class AcpEngine {
       let recentStderr = "";
       let failing = false;
       let noticed = false;
+      let silence: NodeJS.Timeout | undefined;
 
       const finish = (error: Error | null, value?: Json) => {
         if (done) return;
         done = true;
         for (const timer of timers) clearTimeout(timer);
+        if (silence) clearTimeout(silence);
         unwatch();
+        unlisten();
         req.signal?.removeEventListener("abort", onAbort);
         if (error) reject(error);
         else resolve(value!);
@@ -412,6 +439,24 @@ export class AcpEngine {
           if (limit) req.onLimit?.(limit);
         }
       });
+      // Every update is a sign of life; a prompt without any for too long is sitting out a quota
+      // error in silence (see SILENCE_BASE_MS), and the call is better off with a one-off process.
+      const silenceMs = this.silenceMs(prompt.length);
+      const stillAlive = () => {
+        if (silence) clearTimeout(silence);
+        silence = setTimeout(
+          () =>
+            stop(
+              new BridgeError(
+                "gemini_error",
+                `${req.model} gave no sign of life for ${Math.round(silenceMs / 1000)}s in the warm Gemini process, which is how it sits out some quota errors`,
+                { failure: "engine" },
+              ),
+            ),
+          silenceMs,
+        );
+      };
+      const unlisten = connection.onUpdate(sessionId, stillAlive);
       const onAbort = () => stop(new BridgeError("gemini_error", "The request was cancelled and Gemini was told to stop."));
       timers.push(
         setTimeout(
@@ -431,6 +476,7 @@ export class AcpEngine {
 
       // Sent only now, with the stderr watcher already in place, so nothing the prompt
       // triggers (a quota error printed right away) can slip past it.
+      stillAlive();
       connection.request("session/prompt", { sessionId, prompt: [{ type: "text", text: prompt }] }).then(
         (value) => {
           settled = true;

@@ -38167,6 +38167,11 @@ var UNHEALTHY_MS = 5 * 6e4;
 var MAX_SESSIONS = 20;
 var WATCH_GRACE_MS2 = 600;
 var TOOL_VERBS = { read: "reading", search: "searching", fetch: "fetching" };
+var SILENCE_BASE_MS = 4e4;
+var SILENCE_MAX_MS = 12e4;
+function silenceLimitMs(promptChars) {
+  return Math.min(SILENCE_MAX_MS, SILENCE_BASE_MS + Math.round(promptChars / 5));
+}
 var RpcError = class extends Error {
   constructor(message, code) {
     super(message);
@@ -38196,6 +38201,7 @@ var AcpConnection = class {
   buffer = "";
   chunks = /* @__PURE__ */ new Map();
   activity = /* @__PURE__ */ new Map();
+  alive = /* @__PURE__ */ new Map();
   stderrListeners = /* @__PURE__ */ new Set();
   closed = null;
   stderrTail = "";
@@ -38225,6 +38231,11 @@ var AcpConnection = class {
     this.chunks.delete(sessionId);
     this.activity.delete(sessionId);
     return text;
+  }
+  /** `listener` runs on every update for the session: any sign that Gemini is working on it. */
+  onUpdate(sessionId, listener) {
+    this.alive.set(sessionId, listener);
+    return () => this.alive.delete(sessionId);
   }
   /** Kills the whole process tree; `done` runs once the kill has been carried out. */
   kill(kill, done = () => void 0) {
@@ -38273,6 +38284,7 @@ var AcpConnection = class {
   onNotification(method, params) {
     if (method !== "session/update") return;
     const sessionId = String(params.sessionId);
+    this.alive.get(sessionId)?.();
     const update = params.update;
     if (update?.sessionUpdate === "agent_message_chunk" && typeof update.content?.text === "string") {
       this.chunks.get(sessionId)?.push(update.content.text);
@@ -38306,6 +38318,7 @@ var AcpEngine = class {
     this.spawnFn = deps.spawn ?? import_cross_spawn2.default;
     this.killFn = deps.kill ?? import_tree_kill2.default;
     this.now = deps.now ?? Date.now;
+    this.silenceMs = deps.silenceMs ?? silenceLimitMs;
   }
   deps;
   connection = null;
@@ -38318,6 +38331,7 @@ var AcpEngine = class {
   spawnFn;
   killFn;
   now;
+  silenceMs;
   isHealthy() {
     return this.now() >= this.unhealthyUntil;
   }
@@ -38445,11 +38459,14 @@ var AcpEngine = class {
       let recentStderr = "";
       let failing = false;
       let noticed = false;
+      let silence;
       const finish = (error62, value) => {
         if (done) return;
         done = true;
         for (const timer of timers) clearTimeout(timer);
+        if (silence) clearTimeout(silence);
         unwatch();
+        unlisten();
         req.signal?.removeEventListener("abort", onAbort);
         if (error62) reject(error62);
         else resolve(value);
@@ -38480,6 +38497,21 @@ var AcpEngine = class {
           if (limit) req.onLimit?.(limit);
         }
       });
+      const silenceMs = this.silenceMs(prompt.length);
+      const stillAlive = () => {
+        if (silence) clearTimeout(silence);
+        silence = setTimeout(
+          () => stop(
+            new BridgeError(
+              "gemini_error",
+              `${req.model} gave no sign of life for ${Math.round(silenceMs / 1e3)}s in the warm Gemini process, which is how it sits out some quota errors`,
+              { failure: "engine" }
+            )
+          ),
+          silenceMs
+        );
+      };
+      const unlisten = connection.onUpdate(sessionId, stillAlive);
       const onAbort = () => stop(new BridgeError("gemini_error", "The request was cancelled and Gemini was told to stop."));
       timers.push(
         setTimeout(
@@ -38495,6 +38527,7 @@ var AcpEngine = class {
       if (req.signal?.aborted) onAbort();
       else req.signal?.addEventListener("abort", onAbort, { once: true });
       if (done) return;
+      stillAlive();
       connection.request("session/prompt", { sessionId, prompt: [{ type: "text", text: prompt }] }).then(
         (value) => {
           settled = true;
@@ -39044,7 +39077,7 @@ async function runGemini(ctx, req) {
       if (failure2 === "engine") {
         attempts.push({ model, engine, outcome: "engine", ms, detail: error62.message });
         useAcp = false;
-        req.onProgress?.("The warm Gemini process is unavailable; using a one-off process.");
+        req.onProgress?.(`${error62.message.replace(/[.\s]+$/, "")}; asking again with a one-off process\u2026`);
         continue;
       }
       if (error62.type === "quota" || failure2 === "unavailable") {
