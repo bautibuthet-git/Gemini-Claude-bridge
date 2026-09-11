@@ -3,8 +3,10 @@ export type BridgeErrorType =
   | "not_installed"
   | "not_authenticated"
   | "timeout"
+  | "quota"
   | "gemini_error"
-  | "invalid_paths";
+  | "invalid_paths"
+  | "unknown_job";
 
 /** What Claude should do next for each failure — returned alongside the error text. */
 export const ERROR_HINTS: Record<BridgeErrorType, string> = {
@@ -15,10 +17,14 @@ export const ERROR_HINTS: Record<BridgeErrorType, string> = {
   not_authenticated:
     "The Gemini CLI is not logged in. Tell the user to run `gemini` once in a terminal and sign in with Google. Meanwhile, do the task yourself.",
   timeout:
-    "Gemini did not answer in time. Retry with a narrower prompt, fewer paths or a larger timeoutMs, or do the task yourself.",
+    "Gemini did not answer in time. Retry with a narrower prompt, fewer paths, background: true or a larger timeoutMs, or do the task yourself.",
+  quota:
+    "Every Gemini model the bridge tried is out of quota or unavailable right now (the message says when they recover). Do the task yourself; the bridge retries those models automatically once they recover.",
   gemini_error:
-    "The Gemini CLI reported an error (see message). Retry once if it looks transient (e.g. a rate limit), otherwise do the task yourself.",
+    "The Gemini CLI reported an error (see message). Retry once if it looks transient, otherwise do the task yourself.",
   invalid_paths: "Fix the listed paths (prefer absolute paths that exist) and call gemini_ask again.",
+  unknown_job:
+    "No background job has that id in this session (jobs live only as long as this Claude session). Call gemini_result without a jobId to list the current ones.",
 };
 
 export class BridgeError extends Error {
@@ -31,6 +37,10 @@ export class BridgeError extends Error {
   ) {
     super(message);
   }
+}
+
+export function asBridgeError(err: unknown): BridgeError {
+  return err instanceof BridgeError ? err : new BridgeError("gemini_error", errorMessage(err));
 }
 
 export function errorMessage(err: unknown): string {

@@ -1,5 +1,7 @@
-// Bundles src/ into a single dependency-free dist/index.js. The output is committed:
-// installing the plugin is a git clone with no build step, so dist/ must ship in the repo.
+// Bundles src/ into dependency-free files under dist/. The output is committed: installing the
+// plugin is a git clone with no build step, so dist/ must ship in the repo.
+//   dist/index.js      MCP server (+ --check for the SessionStart banner)
+//   dist/read-hook.js  PreToolUse hook for Read: runs before every Read, so it stays tiny
 import { build } from "esbuild";
 import { readFile } from "node:fs/promises";
 import { fileURLToPath } from "node:url";
@@ -7,10 +9,8 @@ import { fileURLToPath } from "node:url";
 const root = fileURLToPath(new URL("..", import.meta.url));
 const pkg = JSON.parse(await readFile(new URL("../package.json", import.meta.url), "utf8"));
 
-await build({
+const common = {
   absWorkingDir: root,
-  entryPoints: ["src/index.ts"],
-  outfile: "dist/index.js",
   bundle: true,
   platform: "node",
   target: "node20",
@@ -26,4 +26,7 @@ await build({
   define: { __BRIDGE_VERSION__: JSON.stringify(pkg.version) },
   legalComments: "eof",
   logLevel: "info",
-});
+};
+
+await build({ ...common, entryPoints: ["src/index.ts"], outfile: "dist/index.js" });
+await build({ ...common, entryPoints: ["src/read-hook.ts"], outfile: "dist/read-hook.js" });

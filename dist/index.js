@@ -46,8 +46,8 @@ var require_windows = __commonJS({
   "node_modules/isexe/windows.js"(exports, module) {
     module.exports = isexe;
     isexe.sync = sync;
-    var fs5 = __require("fs");
-    function checkPathExt(path4, options) {
+    var fs8 = __require("fs");
+    function checkPathExt(path7, options) {
       var pathext = options.pathExt !== void 0 ? options.pathExt : process.env.PATHEXT;
       if (!pathext) {
         return true;
@@ -58,25 +58,25 @@ var require_windows = __commonJS({
       }
       for (var i = 0; i < pathext.length; i++) {
         var p = pathext[i].toLowerCase();
-        if (p && path4.substr(-p.length).toLowerCase() === p) {
+        if (p && path7.substr(-p.length).toLowerCase() === p) {
           return true;
         }
       }
       return false;
     }
-    function checkStat(stat, path4, options) {
+    function checkStat(stat, path7, options) {
       if (!stat.isSymbolicLink() && !stat.isFile()) {
         return false;
       }
-      return checkPathExt(path4, options);
+      return checkPathExt(path7, options);
     }
-    function isexe(path4, options, cb) {
-      fs5.stat(path4, function(er, stat) {
-        cb(er, er ? false : checkStat(stat, path4, options));
+    function isexe(path7, options, cb) {
+      fs8.stat(path7, function(er, stat) {
+        cb(er, er ? false : checkStat(stat, path7, options));
       });
     }
-    function sync(path4, options) {
-      return checkStat(fs5.statSync(path4), path4, options);
+    function sync(path7, options) {
+      return checkStat(fs8.statSync(path7), path7, options);
     }
   }
 });
@@ -86,14 +86,14 @@ var require_mode = __commonJS({
   "node_modules/isexe/mode.js"(exports, module) {
     module.exports = isexe;
     isexe.sync = sync;
-    var fs5 = __require("fs");
-    function isexe(path4, options, cb) {
-      fs5.stat(path4, function(er, stat) {
+    var fs8 = __require("fs");
+    function isexe(path7, options, cb) {
+      fs8.stat(path7, function(er, stat) {
         cb(er, er ? false : checkStat(stat, options));
       });
     }
-    function sync(path4, options) {
-      return checkStat(fs5.statSync(path4), options);
+    function sync(path7, options) {
+      return checkStat(fs8.statSync(path7), options);
     }
     function checkStat(stat, options) {
       return stat.isFile() && checkMode(stat, options);
@@ -117,7 +117,7 @@ var require_mode = __commonJS({
 // node_modules/isexe/index.js
 var require_isexe = __commonJS({
   "node_modules/isexe/index.js"(exports, module) {
-    var fs5 = __require("fs");
+    var fs8 = __require("fs");
     var core;
     if (process.platform === "win32" || global.TESTING_WINDOWS) {
       core = require_windows();
@@ -126,7 +126,7 @@ var require_isexe = __commonJS({
     }
     module.exports = isexe;
     isexe.sync = sync;
-    function isexe(path4, options, cb) {
+    function isexe(path7, options, cb) {
       if (typeof options === "function") {
         cb = options;
         options = {};
@@ -136,7 +136,7 @@ var require_isexe = __commonJS({
           throw new TypeError("callback not provided");
         }
         return new Promise(function(resolve, reject) {
-          isexe(path4, options || {}, function(er, is) {
+          isexe(path7, options || {}, function(er, is) {
             if (er) {
               reject(er);
             } else {
@@ -145,7 +145,7 @@ var require_isexe = __commonJS({
           });
         });
       }
-      core(path4, options || {}, function(er, is) {
+      core(path7, options || {}, function(er, is) {
         if (er) {
           if (er.code === "EACCES" || options && options.ignoreErrors) {
             er = null;
@@ -155,9 +155,9 @@ var require_isexe = __commonJS({
         cb(er, is);
       });
     }
-    function sync(path4, options) {
+    function sync(path7, options) {
       try {
-        return core.sync(path4, options || {});
+        return core.sync(path7, options || {});
       } catch (er) {
         if (options && options.ignoreErrors || er.code === "EACCES") {
           return false;
@@ -173,7 +173,7 @@ var require_isexe = __commonJS({
 var require_which = __commonJS({
   "node_modules/which/which.js"(exports, module) {
     var isWindows = process.platform === "win32" || process.env.OSTYPE === "cygwin" || process.env.OSTYPE === "msys";
-    var path4 = __require("path");
+    var path7 = __require("path");
     var COLON = isWindows ? ";" : ":";
     var isexe = require_isexe();
     var getNotFoundError = (cmd) => Object.assign(new Error(`not found: ${cmd}`), { code: "ENOENT" });
@@ -211,7 +211,7 @@ var require_which = __commonJS({
           return opt.all && found.length ? resolve(found) : reject(getNotFoundError(cmd));
         const ppRaw = pathEnv[i];
         const pathPart = /^".*"$/.test(ppRaw) ? ppRaw.slice(1, -1) : ppRaw;
-        const pCmd = path4.join(pathPart, cmd);
+        const pCmd = path7.join(pathPart, cmd);
         const p = !pathPart && /^\.[\\\/]/.test(cmd) ? cmd.slice(0, 2) + pCmd : pCmd;
         resolve(subStep(p, i, 0));
       });
@@ -238,7 +238,7 @@ var require_which = __commonJS({
       for (let i = 0; i < pathEnv.length; i++) {
         const ppRaw = pathEnv[i];
         const pathPart = /^".*"$/.test(ppRaw) ? ppRaw.slice(1, -1) : ppRaw;
-        const pCmd = path4.join(pathPart, cmd);
+        const pCmd = path7.join(pathPart, cmd);
         const p = !pathPart && /^\.[\\\/]/.test(cmd) ? cmd.slice(0, 2) + pCmd : pCmd;
         for (let j = 0; j < pathExt.length; j++) {
           const cur = p + pathExt[j];
@@ -286,7 +286,7 @@ var require_path_key = __commonJS({
 var require_resolveCommand = __commonJS({
   "node_modules/cross-spawn/lib/util/resolveCommand.js"(exports, module) {
     "use strict";
-    var path4 = __require("path");
+    var path7 = __require("path");
     var which = require_which();
     var getPathKey = require_path_key();
     function resolveCommandAttempt(parsed, withoutPathExt) {
@@ -304,7 +304,7 @@ var require_resolveCommand = __commonJS({
       try {
         resolved = which.sync(parsed.command, {
           path: env[getPathKey({ env })],
-          pathExt: withoutPathExt ? path4.delimiter : void 0
+          pathExt: withoutPathExt ? path7.delimiter : void 0
         });
       } catch (e) {
       } finally {
@@ -313,7 +313,7 @@ var require_resolveCommand = __commonJS({
         }
       }
       if (resolved) {
-        resolved = path4.resolve(hasCustomCwd ? parsed.options.cwd : "", resolved);
+        resolved = path7.resolve(hasCustomCwd ? parsed.options.cwd : "", resolved);
       }
       return resolved;
     }
@@ -367,8 +367,8 @@ var require_shebang_command = __commonJS({
       if (!match) {
         return null;
       }
-      const [path4, argument] = match[0].replace(/#! ?/, "").split(" ");
-      const binary = path4.split("/").pop();
+      const [path7, argument] = match[0].replace(/#! ?/, "").split(" ");
+      const binary = path7.split("/").pop();
       if (binary === "env") {
         return argument;
       }
@@ -381,16 +381,16 @@ var require_shebang_command = __commonJS({
 var require_readShebang = __commonJS({
   "node_modules/cross-spawn/lib/util/readShebang.js"(exports, module) {
     "use strict";
-    var fs5 = __require("fs");
+    var fs8 = __require("fs");
     var shebangCommand = require_shebang_command();
     function readShebang(command) {
       const size = 150;
       const buffer = Buffer.alloc(size);
       let fd;
       try {
-        fd = fs5.openSync(command, "r");
-        fs5.readSync(fd, buffer, 0, size, 0);
-        fs5.closeSync(fd);
+        fd = fs8.openSync(command, "r");
+        fs8.readSync(fd, buffer, 0, size, 0);
+        fs8.closeSync(fd);
       } catch (e) {
       }
       return shebangCommand(buffer.toString());
@@ -403,7 +403,7 @@ var require_readShebang = __commonJS({
 var require_parse = __commonJS({
   "node_modules/cross-spawn/lib/parse.js"(exports, module) {
     "use strict";
-    var path4 = __require("path");
+    var path7 = __require("path");
     var resolveCommand = require_resolveCommand();
     var escape2 = require_escape();
     var readShebang = require_readShebang();
@@ -428,7 +428,7 @@ var require_parse = __commonJS({
       const needsShell = !isExecutableRegExp.test(commandFile);
       if (parsed.options.forceShell || needsShell) {
         const needsDoubleEscapeMetaChars = isCmdShimRegExp.test(commandFile);
-        parsed.command = path4.normalize(parsed.command);
+        parsed.command = path7.normalize(parsed.command);
         parsed.command = escape2.command(parsed.command);
         parsed.args = parsed.args.map((arg) => escape2.argument(arg, needsDoubleEscapeMetaChars));
         const shellCommand = [parsed.command].concat(parsed.args).join(" ");
@@ -3877,8 +3877,8 @@ var require_utils = __commonJS({
       }
       return ind;
     }
-    function removeDotSegments(path4) {
-      let input2 = path4;
+    function removeDotSegments(path7) {
+      let input2 = path7;
       const output2 = [];
       let nextSlash = -1;
       let len = 0;
@@ -4287,8 +4287,8 @@ var require_schemes = __commonJS({
       }
       if (wsComponent.resourceName) {
         const queryIndex = wsComponent.resourceName.indexOf("?");
-        const path4 = queryIndex === -1 ? wsComponent.resourceName : wsComponent.resourceName.slice(0, queryIndex);
-        wsComponent.path = path4 && path4 !== "/" ? path4 : void 0;
+        const path7 = queryIndex === -1 ? wsComponent.resourceName : wsComponent.resourceName.slice(0, queryIndex);
+        wsComponent.path = path7 && path7 !== "/" ? path7 : void 0;
         wsComponent.query = queryIndex === -1 ? void 0 : wsComponent.resourceName.slice(queryIndex + 1);
         wsComponent.resourceName = void 0;
       }
@@ -7800,12 +7800,12 @@ var require_dist = __commonJS({
         throw new Error(`Unknown format "${name}"`);
       return f;
     };
-    function addFormats(ajv, list, fs5, exportName) {
+    function addFormats(ajv, list, fs8, exportName) {
       var _a3;
       var _b;
       (_a3 = (_b = ajv.opts.code).formats) !== null && _a3 !== void 0 ? _a3 : _b.formats = (0, codegen_1._)`require("ajv-formats/dist/formats").${exportName}`;
       for (const f of list)
-        ajv.addFormat(f, fs5[f]);
+        ajv.addFormat(f, fs8[f]);
     }
     module.exports = exports = formatsPlugin;
     Object.defineProperty(exports, "__esModule", { value: true });
@@ -7823,9 +7823,11 @@ var ERROR_HINTS = {
   disabled: "The user turned the Gemini bridge off. Do the task yourself. Only call gemini_bridge_toggle(enabled: true) if the user asks to turn it back on.",
   not_installed: "The Gemini CLI is not installed or not on PATH. Tell the user to run `npm install -g @google/gemini-cli`, then restart Claude Code. Meanwhile, do the task yourself.",
   not_authenticated: "The Gemini CLI is not logged in. Tell the user to run `gemini` once in a terminal and sign in with Google. Meanwhile, do the task yourself.",
-  timeout: "Gemini did not answer in time. Retry with a narrower prompt, fewer paths or a larger timeoutMs, or do the task yourself.",
-  gemini_error: "The Gemini CLI reported an error (see message). Retry once if it looks transient (e.g. a rate limit), otherwise do the task yourself.",
-  invalid_paths: "Fix the listed paths (prefer absolute paths that exist) and call gemini_ask again."
+  timeout: "Gemini did not answer in time. Retry with a narrower prompt, fewer paths, background: true or a larger timeoutMs, or do the task yourself.",
+  quota: "Every Gemini model the bridge tried is out of quota or unavailable right now (the message says when they recover). Do the task yourself; the bridge retries those models automatically once they recover.",
+  gemini_error: "The Gemini CLI reported an error (see message). Retry once if it looks transient, otherwise do the task yourself.",
+  invalid_paths: "Fix the listed paths (prefer absolute paths that exist) and call gemini_ask again.",
+  unknown_job: "No background job has that id in this session (jobs live only as long as this Claude session). Call gemini_result without a jobId to list the current ones."
 };
 var BridgeError = class extends Error {
   constructor(type, message, details = {}) {
@@ -7837,6 +7839,9 @@ var BridgeError = class extends Error {
   details;
   name = "BridgeError";
 };
+function asBridgeError(err) {
+  return err instanceof BridgeError ? err : new BridgeError("gemini_error", errorMessage(err));
+}
 function errorMessage(err) {
   return err instanceof Error ? err.message : String(err);
 }
@@ -7868,6 +7873,34 @@ function getEnv(env, name, platform = process.platform) {
   if (platform !== "win32") return env[name];
   const key = Object.keys(env).find((k) => k.toUpperCase() === name.toUpperCase());
   return key === void 0 ? void 0 : env[key];
+}
+function withAugmentedPath(env = process.env, platform = process.platform) {
+  const key = Object.keys(env).find((k) => k.toUpperCase() === "PATH") ?? "PATH";
+  const separator = platform === "win32" ? ";" : ":";
+  const current = (env[key] ?? "").split(separator).filter(Boolean);
+  const normalize = (dir) => platform === "win32" ? dir.toLowerCase().replace(/[\\/]+$/, "") : dir.replace(/\/+$/, "");
+  const present = new Set(current.map(normalize));
+  const missing = wellKnownBinDirs(env, platform).filter((dir) => !present.has(normalize(dir)) && isDirectory(dir));
+  return missing.length === 0 ? env : { ...env, [key]: [...current, ...missing].join(separator) };
+}
+function wellKnownBinDirs(env, platform) {
+  if (platform !== "win32") return ["/usr/local/bin", "/opt/homebrew/bin"];
+  const programFiles = getEnv(env, "ProgramFiles", platform) ?? "C:\\Program Files";
+  const appData = getEnv(env, "APPDATA", platform);
+  const localAppData = getEnv(env, "LOCALAPPDATA", platform);
+  return [
+    path.win32.join(programFiles, "nodejs"),
+    path.win32.join(programFiles, "WinGet", "Links"),
+    ...appData ? [path.win32.join(appData, "npm")] : [],
+    ...localAppData ? [path.win32.join(localAppData, "Microsoft", "WinGet", "Links")] : []
+  ];
+}
+function isDirectory(dir) {
+  try {
+    return fs.statSync(dir).isDirectory();
+  } catch {
+    return false;
+  }
 }
 function findOnPath(command, env = process.env, platform = process.platform) {
   const p = platform === "win32" ? path.win32 : path.posix;
@@ -7959,6 +7992,9 @@ function expandHome(p) {
   if (p.startsWith("~/") || p.startsWith("~\\")) return path.join(os.homedir(), p.slice(2));
   return p;
 }
+function projectDirForGemini(dir) {
+  return isReasonableProjectDir(dir) ? path.resolve(dir) : null;
+}
 function isReasonableProjectDir(dir) {
   const resolved = path.resolve(dir);
   if (path.parse(resolved).root === resolved) return false;
@@ -7984,12 +8020,90 @@ function isFile(p) {
 // src/gemini/invoke.ts
 var import_cross_spawn = __toESM(require_cross_spawn(), 1);
 var import_tree_kill = __toESM(require_tree_kill(), 1);
+
+// src/gemini/models.ts
+var STRONG_MODES = /* @__PURE__ */ new Set(["review", "refactor", "plan", "test"]);
+function tierFor(mode) {
+  return STRONG_MODES.has(mode) ? "strong" : "fast";
+}
+function modelChain(preferences, mode, explicit) {
+  const chain = [explicit, preferences.model, ...preferences.models[tierFor(mode)]];
+  return [...new Set(chain.filter((model) => Boolean(model)))];
+}
+function planChain(chain, cooldowns, now, explicit) {
+  const tryOrder = [];
+  const skipped = [];
+  for (const model of chain) {
+    const cooldown = cooldowns[model];
+    if (model !== explicit && cooldown && Date.parse(cooldown.until) > now.getTime()) {
+      skipped.push({ model, ...cooldown });
+    } else {
+      tryOrder.push(model);
+    }
+  }
+  if (tryOrder.length === 0 && skipped.length > 0) {
+    const soonest = [...skipped].sort((a, b) => Date.parse(a.until) - Date.parse(b.until))[0];
+    tryOrder.push(soonest.model);
+  }
+  return { tryOrder, skipped };
+}
+var QUOTA_PATTERN = /(TerminalQuotaError|RetryableQuotaError|RESOURCE_EXHAUSTED|exceeded your current quota|exhausted your daily quota|quota exceeded|\b429\b|too many requests|rate.?limit)/i;
+var UNAVAILABLE_PATTERN = /(ModelNotFoundError|is not found for API version|not supported for generateContent|no longer available|unknown model|invalid model)/i;
+var TRANSIENT_PATTERN = /(overloaded|\bUNAVAILABLE\b|\b50[0234]\b|internal error|deadline exceeded|ECONNRESET|ETIMEDOUT|EAI_AGAIN|socket hang up|fetch failed|network error)/i;
+function parseQuota(message) {
+  if (!QUOTA_PATTERN.test(message)) return null;
+  const retry = /retry in\s+([\d.]+)\s*s/i.exec(message);
+  const retryAfterMs = retry ? Math.ceil(Number(retry[1]) * 1e3) : null;
+  if (/limit:\s*0\b/.test(message)) return { kind: "no_quota", retryAfterMs };
+  if (/daily|per.?day/i.test(message)) return { kind: "daily", retryAfterMs };
+  return { kind: "rate", retryAfterMs };
+}
+function isModelUnavailable(message) {
+  return UNAVAILABLE_PATTERN.test(message);
+}
+function isTransient(message) {
+  return TRANSIENT_PATTERN.test(message) && !QUOTA_PATTERN.test(message);
+}
+var HOUR = 60 * 6e4;
+function cooldownFor(failure2, now) {
+  const at = (ms) => new Date(now.getTime() + ms).toISOString();
+  if (failure2 === "unavailable") return { until: at(24 * HOUR), reason: "model not available to this account" };
+  switch (failure2.kind) {
+    case "no_quota":
+      return { until: at(24 * HOUR), reason: "no quota for this model on this account" };
+    case "daily":
+      return {
+        until: nextPacificMidnight(now).toISOString(),
+        reason: "daily quota used up (resets at midnight Pacific time)"
+      };
+    case "rate":
+      return { until: at(Math.max(15e3, failure2.retryAfterMs ?? 6e4)), reason: "rate limited" };
+  }
+}
+function nextPacificMidnight(now) {
+  const parts = new Intl.DateTimeFormat("en-US", {
+    timeZone: "America/Los_Angeles",
+    hourCycle: "h23",
+    hour: "2-digit",
+    minute: "2-digit",
+    second: "2-digit"
+  }).formatToParts(now);
+  const part = (type) => Number(parts.find((p) => p.type === type)?.value ?? 0);
+  const sinceMidnightMs = ((part("hour") * 60 + part("minute")) * 60 + part("second")) * 1e3 + now.getMilliseconds();
+  return new Date(now.getTime() - sinceMidnightMs + 24 * HOUR);
+}
+
+// src/gemini/invoke.ts
 var GEMINI_BIN_ENV = "GEMINI_CLAUDE_BRIDGE_GEMINI_BIN";
 function geminiCommand(env = process.env) {
   return getEnv(env, GEMINI_BIN_ENV)?.trim() || "gemini";
 }
+function geminiEnv(base = process.env) {
+  return { ...withAugmentedPath(base), GEMINI_CLI_NO_RELAUNCH: "true" };
+}
 var MAX_CAPTURE_BYTES = 16 * 1024 * 1024;
 var KILL_GRACE_MS = 5e3;
+var WATCH_GRACE_MS = 600;
 function runProcess(command, args, opts) {
   const spawn = opts.spawn ?? import_cross_spawn.default;
   const kill = opts.kill ?? import_tree_kill.default;
@@ -8009,30 +8123,52 @@ function runProcess(command, args, opts) {
     }
     const stdout = new Capture();
     const stderr = new Capture();
-    child.stdout?.on("data", (chunk) => stdout.push(chunk));
-    child.stderr?.on("data", (chunk) => stderr.push(chunk));
     let settled = false;
     let timedOut = false;
     let aborted2 = false;
     let killRequested = false;
+    let stoppedBy = null;
+    let recentStderr = "";
     let graceTimer;
+    let watchTimer;
+    child.stdout?.on("data", (chunk) => stdout.push(chunk));
+    child.stderr?.on("data", (chunk) => {
+      stderr.push(chunk);
+      if (!opts.watch || stoppedBy !== null || killRequested) return;
+      recentStderr = (recentStderr + chunk.toString("utf8")).slice(-4096);
+      const reason = opts.watch(recentStderr);
+      if (reason) {
+        stoppedBy = reason;
+        watchTimer = setTimeout(terminate, opts.watchGraceMs ?? WATCH_GRACE_MS);
+      }
+    });
     const cleanup = () => {
       settled = true;
       clearTimeout(timer);
       if (graceTimer) clearTimeout(graceTimer);
+      if (watchTimer) clearTimeout(watchTimer);
       opts.signal?.removeEventListener("abort", onAbort);
     };
     const finish = (code, signal) => {
       if (settled) return;
       cleanup();
-      resolve({ code, signal, stdout: stdout.text(), stderr: stderr.text(), timedOut, aborted: aborted2, durationMs: Date.now() - started });
+      resolve({
+        code,
+        signal,
+        stdout: stdout.text(),
+        stderr: stderr.text(),
+        timedOut,
+        aborted: aborted2,
+        stoppedBy,
+        durationMs: Date.now() - started
+      });
     };
-    const terminate = () => {
-      if (killRequested) return;
+    function terminate() {
+      if (killRequested || settled) return;
       killRequested = true;
       graceTimer = setTimeout(() => finish(null, "SIGKILL"), opts.killGraceMs ?? KILL_GRACE_MS);
       if (child.pid !== void 0) kill(child.pid, "SIGKILL", () => void 0);
-    };
+    }
     const onAbort = () => {
       aborted2 = true;
       terminate();
@@ -8078,21 +8214,44 @@ function buildGeminiArgs(req) {
     `--approval-mode=${req.yolo ? "yolo" : "default"}`
   ];
   if (req.model) args.push(`--model=${req.model}`);
+  if (req.resumeSessionId) args.push(`--resume=${req.resumeSessionId}`);
   for (const dir of req.includeDirectories ?? []) args.push(`--include-directories=${dir}`);
   return args;
 }
+var FAIL_FAST_PATTERN = /(TerminalQuotaError|RetryableQuotaError|RESOURCE_EXHAUSTED|exceeded your current quota|exhausted your daily quota|ModelNotFoundError|is not found for API version)/i;
+function watchForModelFailure(recentStderr) {
+  return FAIL_FAST_PATTERN.exec(recentStderr)?.[0] ?? null;
+}
+var RETRY_WAIT_PATTERN = /(Retrying after \d+\s*ms|retry in\s+[\d.]+\s*s)/i;
+function describeWait(recentStderr) {
+  const retryMs = /Retrying after (\d+)\s*ms/i.exec(recentStderr);
+  const retryS = /retry in\s+([\d.]+)\s*s/i.exec(recentStderr);
+  const seconds = retryMs ? Math.round(Number(retryMs[1]) / 1e3) : retryS ? Math.round(Number(retryS[1])) : null;
+  return `Gemini hit its per-minute quota; the Gemini CLI waits${seconds ? ` ~${seconds}s` : ""} and retries by itself\u2026`;
+}
 async function invokeGemini(req, deps = {}) {
   const command = deps.command ?? geminiCommand(deps.env);
+  let noticed = false;
+  const watch = (recentStderr) => {
+    const failure2 = watchForModelFailure(recentStderr);
+    if (failure2 && req.failFast) return failure2;
+    if (!noticed && RETRY_WAIT_PATTERN.test(recentStderr)) {
+      noticed = true;
+      req.onNotice?.(describeWait(recentStderr));
+    }
+    return null;
+  };
   let result;
   try {
     result = await runProcess(command, buildGeminiArgs(req), {
       cwd: req.cwd,
       input: req.prompt,
       timeoutMs: req.timeoutMs,
-      env: deps.env,
+      env: geminiEnv(deps.env ?? process.env),
       signal: req.signal,
       spawn: deps.spawn,
-      kill: deps.kill
+      kill: deps.kill,
+      watch
     });
   } catch (err) {
     if (isErrnoException(err, "ENOENT")) {
@@ -8108,7 +8267,6 @@ var EXIT_TURN_LIMIT = 53;
 var EXIT_UNTRUSTED = 55;
 var EXIT_NOT_FOUND = /* @__PURE__ */ new Set([9009, 127]);
 var AUTH_PATTERN = /(authenticat|auth method|not logged in|\blog ?in\b|\bsign ?in\b|credential|oauth|api key|unauthenticated|invalid_grant|\b401\b)/i;
-var QUOTA_PATTERN = /(quota|rate.?limit|resource_exhausted|\b429\b|too many requests)/i;
 var INELIGIBLE_PATTERN = /(ineligibletier|unsupported_client|no longer supported for gemini code assist|antigravity)/i;
 var NOISE_PATTERNS = [
   /^\s+at\s/,
@@ -8118,6 +8276,17 @@ var NOISE_PATTERNS = [
   /^Loaded cached credentials/i
 ];
 function interpretResult(r, timeoutMs) {
+  const json2 = parseGeminiJson(r.stdout) ?? parseGeminiJson(r.stderr);
+  const exitCode = r.code ?? -1;
+  const warnings = Array.isArray(json2?.warnings) ? json2.warnings.filter((w) => typeof w === "string") : [];
+  const sessionId = typeof json2?.session_id === "string" ? json2.session_id : null;
+  if (typeof json2?.response === "string" && json2.response.trim() && !json2.error) {
+    return { text: json2.response.trim(), model: primaryModel(json2.stats), durationMs: r.durationMs, exitCode, warnings, sessionId };
+  }
+  if (r.stoppedBy) {
+    const message2 = json2?.error?.message?.trim() || summarizeOutput(r.stderr) || r.stoppedBy;
+    throw classifyFailure(r.code ?? -1, message2, json2?.error?.type, r.stderr);
+  }
   if (r.timedOut) {
     throw new BridgeError(
       "timeout",
@@ -8130,33 +8299,42 @@ function interpretResult(r, timeoutMs) {
       durationMs: r.durationMs
     });
   }
-  const exitCode = r.code ?? -1;
-  const json2 = parseGeminiJson(r.stdout) ?? parseGeminiJson(r.stderr);
   if (exitCode === 0 && !json2?.error) {
-    const text = (typeof json2?.response === "string" ? json2.response : json2 ? "" : r.stdout).trim();
+    const text = (json2 ? "" : r.stdout).trim();
     if (!text) throw new BridgeError("gemini_error", "Gemini returned an empty response.", { exitCode });
-    const warnings = Array.isArray(json2?.warnings) ? json2.warnings.filter((w) => typeof w === "string") : [];
-    return { text, model: primaryModel(json2?.stats), durationMs: r.durationMs, exitCode, warnings };
+    return { text, model: null, durationMs: r.durationMs, exitCode, warnings, sessionId };
   }
   const message = json2?.error?.message?.trim() || summarizeOutput(r.stderr) || summarizeOutput(r.stdout) || "no error output";
-  throw classifyFailure(exitCode, message, json2?.error?.type);
+  throw classifyFailure(exitCode, message, json2?.error?.type, r.stderr);
 }
-function classifyFailure(exitCode, message, geminiErrorType) {
+function classifyFailure(exitCode, message, geminiErrorType, raw = "") {
   const details = { exitCode, ...geminiErrorType ? { geminiErrorType } : {} };
+  const haystack = `${message}
+${raw}`;
   if (EXIT_NOT_FOUND.has(exitCode)) {
     return new BridgeError("not_installed", `The Gemini CLI could not be started: ${message}`, details);
   }
-  if (INELIGIBLE_PATTERN.test(message)) {
+  if (INELIGIBLE_PATTERN.test(haystack)) {
     return new BridgeError("not_authenticated", `Google rejected this Gemini CLI for that account: ${message}`, {
       ...details,
       nextStep: 'Google refused this Gemini CLI for the signed-in account\'s tier. Tell the user to switch the Gemini CLI to another auth method: create an API key at https://aistudio.google.com/apikey, put GEMINI_API_KEY=<key> in ~/.gemini/.env, and select "Gemini API key" via /auth inside `gemini`. Meanwhile, do the task yourself.'
     });
   }
+  const quota = parseQuota(haystack);
+  if (quota) {
+    return new BridgeError("quota", `Gemini quota or rate limit reached: ${message}`, { ...details, failure: "quota", quota });
+  }
+  if (isModelUnavailable(haystack)) {
+    return new BridgeError("gemini_error", `This Gemini model is not available: ${message}`, {
+      ...details,
+      failure: "unavailable"
+    });
+  }
   if (exitCode === EXIT_AUTH || AUTH_PATTERN.test(message)) {
     return new BridgeError("not_authenticated", `The Gemini CLI is not signed in: ${message}`, details);
   }
-  if (QUOTA_PATTERN.test(message)) {
-    return new BridgeError("gemini_error", `Gemini quota or rate limit reached: ${message}`, details);
+  if (isTransient(haystack)) {
+    return new BridgeError("gemini_error", `Gemini had a temporary problem: ${message}`, { ...details, failure: "transient" });
   }
   const label = exitCode === EXIT_INPUT ? "rejected the input" : exitCode === EXIT_TURN_LIMIT ? "hit its turn limit" : exitCode === EXIT_UNTRUSTED ? "refused to run in an untrusted folder" : "failed";
   return new BridgeError("gemini_error", `The Gemini CLI ${label} (exit ${exitCode}): ${message}`, details);
@@ -8209,7 +8387,7 @@ function summarizeOutput(text, maxChars = 500) {
 // src/gemini/detect.ts
 var DETECT_TTL_MS = 10 * 6e4;
 async function detectInstall(deps = {}) {
-  const env = deps.env ?? process.env;
+  const env = geminiEnv(deps.env ?? process.env);
   const command = deps.command ?? geminiCommand(env);
   const resolved = findOnPath(command, env);
   if (!resolved) return { installed: false, path: null, version: null };
@@ -8220,6 +8398,37 @@ async function detectInstall(deps = {}) {
   } catch (err) {
     return isErrnoException(err, "ENOENT") ? { installed: false, path: null, version: null } : { installed: true, path: resolved, version: null };
   }
+}
+function detectRipgrep(cliPath, env = process.env, platform = process.platform) {
+  const binary = `rg-${platform}-${process.arch}${platform === "win32" ? ".exe" : ""}`;
+  if (cliPath) {
+    const bundle = path2.join(path2.dirname(cliPath), "node_modules", "@google", "gemini-cli", "bundle");
+    for (const candidate of [path2.join(bundle, binary), path2.join(bundle, "vendor", "ripgrep", binary)]) {
+      if (fs2.existsSync(candidate)) return { available: true, path: candidate, detail: "bundled with the Gemini CLI" };
+    }
+  }
+  const found = findOnPath("rg", withAugmentedPath(env, platform), platform);
+  if (!found) return { available: false, path: null, detail: "not installed, so Gemini's searches use a slower built-in grep" };
+  let real = found;
+  try {
+    real = fs2.realpathSync(found);
+  } catch {
+  }
+  return isTrustedSystemPath(real, env, platform) ? { available: true, path: real, detail: "installed" } : { available: false, path: real, detail: "installed outside Program Files, where the Gemini CLI refuses to run it" };
+}
+function isTrustedSystemPath(file2, env, platform) {
+  if (platform === "win32") {
+    const normalize = (p) => path2.win32.resolve(p).replace(/\\/g, "/").toLowerCase();
+    const target = normalize(file2);
+    return [
+      getEnv(env, "SystemRoot", platform) ?? "C:\\Windows",
+      getEnv(env, "ProgramFiles", platform) ?? "C:\\Program Files",
+      getEnv(env, "ProgramFiles(x86)", platform) ?? "C:\\Program Files (x86)"
+    ].map(normalize).some((prefix) => target === prefix || target.startsWith(`${prefix}/`));
+  }
+  return ["/usr/bin", "/bin", "/usr/local/bin", "/opt/homebrew/bin", "/opt/homebrew/Cellar", "/usr/local/Cellar", "/usr/sbin", "/sbin"].some(
+    (prefix) => file2 === prefix || file2.startsWith(`${prefix}/`)
+  );
 }
 function geminiConfigDir(env = process.env) {
   return path2.join(getEnv(env, "GEMINI_CLI_HOME")?.trim() || os2.homedir(), ".gemini");
@@ -8250,16 +8459,19 @@ async function refreshCliStatus(store, opts = {}) {
   const now = opts.now?.() ?? /* @__PURE__ */ new Date();
   const cached2 = (await store.read()).geminiCli;
   const lastCheck = cached2.lastInstalledCheckAt ? Date.parse(cached2.lastInstalledCheckAt) : Number.NaN;
+  const ripgrepFor = opts.detectRipgrep ?? ((cliPath) => detectRipgrep(cliPath));
   if (!opts.force && Number.isFinite(lastCheck) && now.getTime() - lastCheck < (opts.ttlMs ?? DETECT_TTL_MS)) {
     const installed = cached2.lastDetectedVersion !== null;
+    const cliPath = installed ? (opts.findPath ?? (() => findOnPath(geminiCommand(), geminiEnv())))() : null;
     return {
       installed,
-      path: installed ? (opts.findPath ?? (() => findOnPath(geminiCommand())))() : null,
+      path: cliPath,
       version: cached2.lastDetectedVersion,
       authOk: installed ? cached2.lastAuthOk : null,
       authDetail: installed ? cached2.lastAuthDetail : null,
       checkedAt: cached2.lastInstalledCheckAt,
-      fromCache: true
+      fromCache: true,
+      ...installed ? { ripgrep: ripgrepFor(cliPath) } : {}
     };
   }
   const install = await (opts.detectInstall ?? (() => detectInstall()))();
@@ -8283,7 +8495,8 @@ async function refreshCliStatus(store, opts = {}) {
     authOk: install.installed ? next.geminiCli.lastAuthOk : null,
     authDetail: install.installed ? next.geminiCli.lastAuthDetail : null,
     checkedAt: stamp,
-    fromCache: false
+    fromCache: false,
+    ...install.installed ? { ripgrep: ripgrepFor(install.path) } : {}
   };
 }
 function selectedAuthType(settings) {
@@ -9161,10 +9374,10 @@ function mergeDefs(...defs) {
 function cloneDef(schema) {
   return mergeDefs(schema._zod.def);
 }
-function getElementAtPath(obj, path4) {
-  if (!path4)
+function getElementAtPath(obj, path7) {
+  if (!path7)
     return obj;
-  return path4.reduce((acc, key) => acc?.[key], obj);
+  return path7.reduce((acc, key) => acc?.[key], obj);
 }
 function promiseAllObject(promisesObj) {
   const keys = Object.keys(promisesObj);
@@ -9504,11 +9717,11 @@ function explicitlyAborted(x, startIndex = 0) {
   }
   return false;
 }
-function prefixIssues(path4, issues) {
+function prefixIssues(path7, issues) {
   return issues.map((iss) => {
     var _a3;
     (_a3 = iss).path ?? (_a3.path = []);
-    iss.path.unshift(path4);
+    iss.path.unshift(path7);
     return iss;
   });
 }
@@ -9962,16 +10175,16 @@ function flattenError(error62, mapper = (issue2) => issue2.message) {
 }
 function formatError(error62, mapper = (issue2) => issue2.message) {
   const fieldErrors = { _errors: [] };
-  const processError = (error63, path4 = []) => {
+  const processError = (error63, path7 = []) => {
     for (const issue2 of error63.issues) {
       if (issue2.code === "invalid_union" && issue2.errors.length) {
-        issue2.errors.map((issues) => processError({ issues }, [...path4, ...issue2.path]));
+        issue2.errors.map((issues) => processError({ issues }, [...path7, ...issue2.path]));
       } else if (issue2.code === "invalid_key") {
-        processError({ issues: issue2.issues }, [...path4, ...issue2.path]);
+        processError({ issues: issue2.issues }, [...path7, ...issue2.path]);
       } else if (issue2.code === "invalid_element") {
-        processError({ issues: issue2.issues }, [...path4, ...issue2.path]);
+        processError({ issues: issue2.issues }, [...path7, ...issue2.path]);
       } else {
-        const fullpath = [...path4, ...issue2.path];
+        const fullpath = [...path7, ...issue2.path];
         if (fullpath.length === 0) {
           fieldErrors._errors.push(mapper(issue2));
         } else {
@@ -10010,17 +10223,17 @@ function formatError(error62, mapper = (issue2) => issue2.message) {
 }
 function treeifyError(error62, mapper = (issue2) => issue2.message) {
   const result = { errors: [] };
-  const processError = (error63, path4 = []) => {
+  const processError = (error63, path7 = []) => {
     var _a3;
     for (const issue2 of error63.issues) {
       if (issue2.code === "invalid_union" && issue2.errors.length) {
-        issue2.errors.map((issues) => processError({ issues }, [...path4, ...issue2.path]));
+        issue2.errors.map((issues) => processError({ issues }, [...path7, ...issue2.path]));
       } else if (issue2.code === "invalid_key") {
-        processError({ issues: issue2.issues }, [...path4, ...issue2.path]);
+        processError({ issues: issue2.issues }, [...path7, ...issue2.path]);
       } else if (issue2.code === "invalid_element") {
-        processError({ issues: issue2.issues }, [...path4, ...issue2.path]);
+        processError({ issues: issue2.issues }, [...path7, ...issue2.path]);
       } else {
-        const fullpath = [...path4, ...issue2.path];
+        const fullpath = [...path7, ...issue2.path];
         if (fullpath.length === 0) {
           result.errors.push(mapper(issue2));
           continue;
@@ -10059,8 +10272,8 @@ function treeifyError(error62, mapper = (issue2) => issue2.message) {
 }
 function toDotPath(_path) {
   const segs = [];
-  const path4 = _path.map((seg) => typeof seg === "object" ? seg.key : seg);
-  for (const seg of path4) {
+  const path7 = _path.map((seg) => typeof seg === "object" ? seg.key : seg);
+  for (const seg of path7) {
     if (typeof seg === "number")
       segs.push(`[${seg}]`);
     else if (typeof seg === "symbol")
@@ -24936,8 +25149,8 @@ function rewriteKeyNames(ctx) {
       bySchema.set(entry.schema, entry);
   }
   const rewrites = /* @__PURE__ */ new Map();
-  for (const record2 of pendingRecords.get(ctx) ?? []) {
-    const seen = ctx.seen.get(record2);
+  for (const record3 of pendingRecords.get(ctx) ?? []) {
+    const seen = ctx.seen.get(record3);
     const names = (seen?.def ?? seen?.schema)?.propertyNames;
     if (!names || names === true || rewrites.has(names))
       continue;
@@ -27151,13 +27364,13 @@ function resolveRef(ref, ctx) {
   if (!ref.startsWith("#")) {
     throw new Error("External $ref is not supported, only local refs (#/...) are allowed");
   }
-  const path4 = ref.slice(1).split("/").filter(Boolean);
-  if (path4.length === 0) {
+  const path7 = ref.slice(1).split("/").filter(Boolean);
+  if (path7.length === 0) {
     return ctx.rootSchema;
   }
   const defsKey = ctx.version === "draft-2020-12" ? "$defs" : "definitions";
-  if (path4[0] === defsKey) {
-    const key = path4[1] === void 0 ? void 0 : decodeJSONPointerSegment(path4[1]);
+  if (path7[0] === defsKey) {
+    const key = path7[1] === void 0 ? void 0 : decodeJSONPointerSegment(path7[1]);
     if (!key || !ctx.defs[key]) {
       throw new Error(`Reference not found: ${ref}`);
     }
@@ -28019,26 +28232,56 @@ function date4(params) {
 }
 
 // src/state/schema.ts
-var MODES = ["ask", "analyze", "review", "refactor", "plan", "test"];
+var MODES = ["ask", "summarize", "analyze", "review", "refactor", "plan", "test"];
+var ENGINES = ["auto", "cli", "acp"];
 var SCHEMA_VERSION = 1;
 var DEFAULT_TIMEOUT_MS = 18e4;
 var MIN_TIMEOUT_MS = 5e3;
 var MAX_TIMEOUT_MS = 30 * 6e4;
 var CHARS_PER_TOKEN = 4;
+var MODEL_PATTERN = /^[A-Za-z0-9][A-Za-z0-9._:/-]*$/;
+var DEFAULT_MODELS = {
+  /** ask, summarize, analyze: speed matters most. */
+  fast: ["gemini-3.1-flash-lite", "flash", "auto"],
+  /** review, refactor, plan, test: reasoning matters most. */
+  strong: ["pro", "flash", "gemini-3.1-flash-lite"]
+};
 var orEmpty = (value) => value === void 0 ? {} : value;
+var modelName = external_exports.string().regex(MODEL_PATTERN);
 var stateSchema = external_exports.object({
   schemaVersion: external_exports.literal(SCHEMA_VERSION).default(SCHEMA_VERSION),
   enabled: external_exports.boolean().default(true),
   preferences: external_exports.preprocess(
     orEmpty,
     external_exports.object({
-      /** Default Gemini model; null lets the Gemini CLI use its own default. */
-      model: external_exports.string().min(1).nullable().default(null),
+      /** Tried first for every mode, before the chains. null = just use the chains. */
+      model: modelName.nullable().default(null),
+      models: external_exports.preprocess(
+        orEmpty,
+        external_exports.object({
+          fast: external_exports.array(modelName).min(1).default(() => [...DEFAULT_MODELS.fast]),
+          strong: external_exports.array(modelName).min(1).default(() => [...DEFAULT_MODELS.strong])
+        })
+      ),
       /** "yolo" auto-approves Gemini's own tool calls. The prompt still asks it to stay read-only. */
       approvalMode: external_exports.enum(["default", "yolo"]).default("default"),
-      timeoutMs: external_exports.number().int().min(MIN_TIMEOUT_MS).max(MAX_TIMEOUT_MS).default(DEFAULT_TIMEOUT_MS)
+      timeoutMs: external_exports.number().int().min(MIN_TIMEOUT_MS).max(MAX_TIMEOUT_MS).default(DEFAULT_TIMEOUT_MS),
+      /** auto: reuse a warm Gemini process when a call allows it, otherwise start one per call. */
+      engine: external_exports.enum(ENGINES).default("auto"),
+      /** The same question about unchanged files is answered from cache for this long. 0 = off. */
+      cacheTtlMinutes: external_exports.number().int().min(0).max(7 * 24 * 60).default(24 * 60),
+      /** Before Claude reads a big file whole, suggest delegating it (once per file per session). */
+      suggestDelegation: external_exports.preprocess(
+        orEmpty,
+        external_exports.object({
+          enabled: external_exports.boolean().default(true),
+          minLines: external_exports.number().int().min(50).default(800)
+        })
+      )
     })
   ),
+  /** Models that recently ran out of quota (or don't exist for this account) are skipped until `until`. */
+  modelCooldowns: external_exports.record(external_exports.string(), external_exports.object({ until: external_exports.string(), reason: external_exports.string() })).default(() => ({})),
   geminiCli: external_exports.preprocess(
     orEmpty,
     external_exports.object({
@@ -28055,9 +28298,10 @@ var stateSchema = external_exports.object({
     external_exports.object({
       totalCalls: external_exports.number().int().nonnegative().default(0),
       totalErrors: external_exports.number().int().nonnegative().default(0),
-      callsByMode: external_exports.record(external_exports.string(), external_exports.number().int().nonnegative()).default({}),
+      callsByMode: external_exports.record(external_exports.string(), external_exports.number().int().nonnegative()).default(() => ({})),
       lastUsedAt: external_exports.string().nullable().default(null),
-      estimatedCharsSaved: external_exports.number().nonnegative().default(0)
+      estimatedCharsSaved: external_exports.number().nonnegative().default(0),
+      cacheHits: external_exports.number().int().nonnegative().default(0)
     })
   )
 });
@@ -28541,8 +28785,8 @@ function getErrorMap2() {
 
 // node_modules/zod/v3/helpers/parseUtil.js
 var makeIssue = (params) => {
-  const { data, path: path4, errorMaps, issueData } = params;
-  const fullPath = [...path4, ...issueData.path || []];
+  const { data, path: path7, errorMaps, issueData } = params;
+  const fullPath = [...path7, ...issueData.path || []];
   const fullIssue = {
     ...issueData,
     path: fullPath
@@ -28657,11 +28901,11 @@ var errorUtil;
 
 // node_modules/zod/v3/types.js
 var ParseInputLazyPath = class {
-  constructor(parent, value, path4, key) {
+  constructor(parent, value, path7, key) {
     this._cachedPath = [];
     this.parent = parent;
     this.data = value;
-    this._path = path4;
+    this._path = path7;
     this._key = key;
   }
   get path() {
@@ -32212,11 +32456,11 @@ function normalizeObjectSchema(schema) {
   }
   return void 0;
 }
-function getDotPath(path4) {
-  if (path4.length === 0) {
+function getDotPath(path7) {
+  if (path7.length === 0) {
     return "object root";
   }
-  return path4.reduce((acc, seg, index) => {
+  return path7.reduce((acc, seg, index) => {
     if (index === 0) {
       return String(seg);
     }
@@ -37778,32 +38022,597 @@ var StdioServerTransport = class {
 };
 
 // src/context.ts
+import fs6 from "node:fs/promises";
+import path6 from "node:path";
+
+// src/cache.ts
+import crypto from "node:crypto";
 import fs4 from "node:fs/promises";
-function createContext(store = new StateStore()) {
+import path4 from "node:path";
+var ResponseCache = class {
+  constructor(dir, maxEntries = 300) {
+    this.dir = dir;
+    this.maxEntries = maxEntries;
+  }
+  dir;
+  maxEntries;
+  writes = 0;
+  static key(parts) {
+    return crypto.createHash("sha256").update(JSON.stringify(parts)).digest("hex");
+  }
+  async get(key, ttlMs, now) {
+    try {
+      const entry = JSON.parse(await fs4.readFile(this.file(key), "utf8"));
+      if (typeof entry.text !== "string" || Date.parse(entry.createdAt) + ttlMs < now.getTime()) return null;
+      return entry;
+    } catch {
+      return null;
+    }
+  }
+  async set(key, entry) {
+    await fs4.mkdir(this.dir, { recursive: true });
+    const tmp = `${this.file(key)}.${process.pid}.${Date.now()}.tmp`;
+    await fs4.writeFile(tmp, JSON.stringify(entry), "utf8");
+    await fs4.rename(tmp, this.file(key)).catch(async (err) => {
+      await fs4.rm(tmp, { force: true });
+      throw err;
+    });
+    if (++this.writes % 20 === 0) await this.prune();
+  }
+  /** Keeps the newest entries only. */
+  async prune() {
+    const names = (await fs4.readdir(this.dir).catch(() => [])).filter((name) => name.endsWith(".json"));
+    if (names.length <= this.maxEntries) return;
+    const entries = await Promise.all(
+      names.map(async (name) => ({ name, mtime: (await fs4.stat(path4.join(this.dir, name)).catch(() => null))?.mtimeMs ?? 0 }))
+    );
+    entries.sort((a, b) => a.mtime - b.mtime);
+    for (const { name } of entries.slice(0, entries.length - this.maxEntries)) {
+      await fs4.rm(path4.join(this.dir, name), { force: true });
+    }
+  }
+  file(key) {
+    return path4.join(this.dir, `${key}.json`);
+  }
+};
+
+// src/gemini/acp.ts
+var import_cross_spawn2 = __toESM(require_cross_spawn(), 1);
+var import_tree_kill2 = __toESM(require_tree_kill(), 1);
+
+// src/version.ts
+var VERSION = true ? "0.1.0" : "dev";
+
+// src/gemini/acp.ts
+var ACP_PROTOCOL_VERSION = 1;
+var START_TIMEOUT_MS = 6e4;
+var CANCEL_GRACE_MS = 3e3;
+var IDLE_MS = 10 * 6e4;
+var UNHEALTHY_MS = 5 * 6e4;
+var MAX_SESSIONS = 20;
+var WATCH_GRACE_MS2 = 600;
+var RpcError = class extends Error {
+  constructor(message, code) {
+    super(message);
+    this.code = code;
+  }
+  code;
+};
+var AcpConnection = class {
+  constructor(child, onClosed) {
+    this.child = child;
+    this.onClosed = onClosed;
+    child.stdout?.setEncoding("utf8");
+    child.stdout?.on("data", (data) => this.onData(data));
+    child.stderr?.on("data", (data) => {
+      const chunk = data.toString("utf8");
+      this.stderrTail = (this.stderrTail + chunk).slice(-8192);
+      for (const listener of this.stderrListeners) listener(chunk);
+    });
+    child.stdin?.on("error", () => void 0);
+    child.on("error", (err) => this.close(err));
+    child.on("close", () => this.close(new Error(`the Gemini ACP process exited. ${lastLine(this.stderrTail)}`.trim())));
+  }
+  child;
+  onClosed;
+  nextId = 1;
+  pending = /* @__PURE__ */ new Map();
+  buffer = "";
+  chunks = /* @__PURE__ */ new Map();
+  stderrListeners = /* @__PURE__ */ new Set();
+  closed = null;
+  stderrTail = "";
+  request(method, params) {
+    if (this.closed) return Promise.reject(this.closed);
+    const id = this.nextId++;
+    return new Promise((resolve, reject) => {
+      this.pending.set(id, { resolve, reject });
+      this.send({ jsonrpc: "2.0", id, method, params });
+    });
+  }
+  notify(method, params) {
+    if (!this.closed) this.send({ jsonrpc: "2.0", method, params });
+  }
+  /** Stderr written from now on (it is shared by every session of the process). */
+  watchStderr(listener) {
+    this.stderrListeners.add(listener);
+    return () => this.stderrListeners.delete(listener);
+  }
+  collect(sessionId) {
+    this.chunks.set(sessionId, []);
+  }
+  takeText(sessionId) {
+    const text = (this.chunks.get(sessionId) ?? []).join("");
+    this.chunks.delete(sessionId);
+    return text;
+  }
+  /** Kills the whole process tree; `done` runs once the kill has been carried out. */
+  kill(kill, done = () => void 0) {
+    if (this.child.pid !== void 0 && !this.closed) kill(this.child.pid, "SIGKILL", () => done());
+    else done();
+    this.close(new Error("the Gemini ACP process was stopped."));
+  }
+  send(message) {
+    this.child.stdin?.write(`${JSON.stringify(message)}
+`);
+  }
+  onData(data) {
+    this.buffer += data;
+    let newline;
+    while ((newline = this.buffer.indexOf("\n")) !== -1) {
+      const line = this.buffer.slice(0, newline).trim();
+      this.buffer = this.buffer.slice(newline + 1);
+      if (line) this.onMessage(line);
+    }
+  }
+  onMessage(line) {
+    let message;
+    try {
+      message = JSON.parse(line);
+    } catch {
+      return;
+    }
+    const params = message.params ?? {};
+    if (typeof message.method === "string") {
+      if (message.id !== void 0 && message.id !== null) this.answer(message.id, message.method, params);
+      else this.onNotification(message.method, params);
+      return;
+    }
+    if (typeof message.id !== "number") return;
+    const pending = this.pending.get(message.id);
+    if (!pending) return;
+    this.pending.delete(message.id);
+    if (message.error) {
+      const error62 = message.error;
+      const data = typeof error62.data === "string" ? ` ${error62.data}` : "";
+      pending.reject(new RpcError(`${error62.message ?? "ACP error"}${data}`, error62.code));
+    } else {
+      pending.resolve(message.result ?? {});
+    }
+  }
+  onNotification(method, params) {
+    if (method !== "session/update") return;
+    const update = params.update;
+    if (update?.sessionUpdate === "agent_message_chunk" && typeof update.content?.text === "string") {
+      this.chunks.get(String(params.sessionId))?.push(update.content.text);
+    }
+  }
+  /** The bridge is read-only: whatever needs approval (edits, shell) is refused. */
+  answer(id, method, params) {
+    if (method === "session/request_permission") {
+      const options = params.options ?? [];
+      const reject = options.find((o) => o.kind === "reject_once") ?? options.find((o) => o.kind === "reject_always");
+      const outcome = reject?.optionId ? { outcome: "selected", optionId: reject.optionId } : { outcome: "cancelled" };
+      this.send({ jsonrpc: "2.0", id, result: { outcome } });
+      return;
+    }
+    this.send({ jsonrpc: "2.0", id, error: { code: -32601, message: `gemini-claude-bridge does not provide ${method}` } });
+  }
+  close(error62) {
+    if (this.closed) return;
+    this.closed = error62;
+    for (const pending of this.pending.values()) pending.reject(error62);
+    this.pending.clear();
+    this.onClosed(this);
+  }
+};
+var AcpEngine = class {
+  constructor(deps) {
+    this.deps = deps;
+    this.spawnFn = deps.spawn ?? import_cross_spawn2.default;
+    this.killFn = deps.kill ?? import_tree_kill2.default;
+    this.now = deps.now ?? Date.now;
+  }
+  deps;
+  connection = null;
+  starting = null;
+  unhealthyUntil = 0;
+  lastError = null;
+  idleTimer;
+  /** sessionId → last use, for sessions alive in the current process. */
+  sessions = /* @__PURE__ */ new Map();
+  spawnFn;
+  killFn;
+  now;
+  isHealthy() {
+    return this.now() >= this.unhealthyUntil;
+  }
+  hasSession(sessionId) {
+    return this.connection !== null && this.sessions.has(sessionId);
+  }
+  describe() {
+    if (!this.isHealthy()) return `off until ${new Date(this.unhealthyUntil).toISOString()} after an error (${this.lastError})`;
+    return this.connection ? `warm, ${this.sessions.size} open conversation(s)` : "starts on first use";
+  }
+  async run(req) {
+    const startedAt = this.now();
+    const deadline = startedAt + req.timeoutMs;
+    this.clearIdle();
+    let connection;
+    try {
+      connection = await this.connect(Math.min(START_TIMEOUT_MS, req.timeoutMs));
+    } catch (err) {
+      this.markUnhealthy(err);
+      throw new BridgeError("gemini_error", `The warm Gemini process could not start: ${errorMessage(err)}`, {
+        failure: "engine"
+      });
+    }
+    try {
+      const sessionId = req.sessionId && this.sessions.has(req.sessionId) ? req.sessionId : await this.newSession(connection);
+      this.sessions.set(sessionId, this.now());
+      if (req.model !== "auto") await connection.request("session/set_model", { sessionId, modelId: req.model });
+      connection.collect(sessionId);
+      const result = await this.prompt(connection, sessionId, req.prompt, deadline, req);
+      const text = connection.takeText(sessionId).trim();
+      const stopReason = typeof result.stopReason === "string" ? result.stopReason : "end_turn";
+      if (stopReason === "refusal") throw new BridgeError("gemini_error", "Gemini refused to answer this request.");
+      if (!text) throw new BridgeError("gemini_error", `Gemini returned an empty response (stop reason: ${stopReason}).`);
+      return {
+        text,
+        model: modelUsed(result) ?? req.model,
+        durationMs: this.now() - startedAt,
+        exitCode: 0,
+        warnings: stopReason === "end_turn" ? [] : [`The answer may be incomplete (stop reason: ${stopReason}).`],
+        sessionId
+      };
+    } catch (err) {
+      if (err instanceof BridgeError) throw err;
+      if (err instanceof RpcError) throw classifyFailure(-1, err.message, void 0, connection.stderrTail);
+      this.markUnhealthy(err);
+      throw new BridgeError("gemini_error", `The warm Gemini process failed: ${errorMessage(err)}`, { failure: "engine" });
+    } finally {
+      this.evictOldSessions();
+      this.scheduleIdle();
+    }
+  }
+  /**
+   * Stops the process (idle, shutdown); the next call starts a new one. Resolves once the kill
+   * has run (at most 2s), so a shutting-down server doesn't exit before it and orphan Gemini.
+   */
+  close() {
+    this.clearIdle();
+    const connection = this.connection;
+    this.connection = null;
+    this.sessions.clear();
+    if (!connection) return Promise.resolve();
+    return new Promise((resolve) => {
+      const timer = setTimeout(resolve, 2e3);
+      connection.kill(this.killFn, () => {
+        clearTimeout(timer);
+        resolve();
+      });
+    });
+  }
+  async connect(timeoutMs) {
+    if (this.connection && !this.connection.closed) return this.connection;
+    if (!this.isHealthy()) throw new Error(this.lastError ?? "it failed recently");
+    this.starting ??= this.start(timeoutMs).finally(() => {
+      this.starting = null;
+    });
+    return this.starting;
+  }
+  async start(timeoutMs) {
+    const cwd = await this.deps.cwd();
+    const args = ["--acp", "--skip-trust", "--approval-mode=default"];
+    const project = this.deps.projectDir?.();
+    if (project) args.push(`--include-directories=${project}`);
+    const child = this.spawnFn(this.deps.command ?? geminiCommand(this.deps.env), args, {
+      cwd,
+      env: geminiEnv(this.deps.env ?? process.env),
+      stdio: ["pipe", "pipe", "pipe"],
+      windowsHide: true
+    });
+    const connection = new AcpConnection(child, (closed) => {
+      if (this.connection === closed) {
+        this.connection = null;
+        this.sessions.clear();
+      }
+    });
+    const initialize = connection.request("initialize", {
+      protocolVersion: ACP_PROTOCOL_VERSION,
+      clientCapabilities: { fs: { readTextFile: false, writeTextFile: false }, terminal: false },
+      clientInfo: { name: "gemini-claude-bridge", version: VERSION }
+    });
+    try {
+      await withTimeout(initialize, timeoutMs, "it did not answer the ACP handshake in time");
+    } catch (err) {
+      connection.kill(this.killFn);
+      throw err;
+    }
+    this.connection = connection;
+    return connection;
+  }
+  async newSession(connection) {
+    const result = await connection.request("session/new", { cwd: await this.deps.cwd(), mcpServers: [] });
+    if (typeof result.sessionId !== "string") throw new Error("session/new returned no sessionId");
+    return result.sessionId;
+  }
+  prompt(connection, sessionId, prompt, deadline, req) {
+    return new Promise((resolve, reject) => {
+      const timers = [];
+      let settled = false;
+      let done = false;
+      let recentStderr = "";
+      let failing = false;
+      let noticed = false;
+      const finish = (error62, value) => {
+        if (done) return;
+        done = true;
+        for (const timer of timers) clearTimeout(timer);
+        unwatch();
+        req.signal?.removeEventListener("abort", onAbort);
+        if (error62) reject(error62);
+        else resolve(value);
+      };
+      const stop = (error62) => {
+        if (done) return;
+        connection.notify("session/cancel", { sessionId });
+        this.sessions.delete(sessionId);
+        setTimeout(() => {
+          if (!settled && this.connection === connection) void this.close();
+        }, CANCEL_GRACE_MS).unref();
+        finish(error62);
+      };
+      const unwatch = connection.watchStderr((chunk) => {
+        recentStderr = (recentStderr + chunk).slice(-4096);
+        if (req.failFast && !failing && watchForModelFailure(recentStderr)) {
+          failing = true;
+          timers.push(
+            setTimeout(
+              () => stop(classifyFailure(-1, summarizeOutput(recentStderr) || "quota error", void 0, recentStderr)),
+              WATCH_GRACE_MS2
+            )
+          );
+        } else if (!req.failFast && !noticed && RETRY_WAIT_PATTERN.test(recentStderr)) {
+          noticed = true;
+          req.onNotice?.(describeWait(recentStderr));
+        }
+      });
+      const onAbort = () => stop(new BridgeError("gemini_error", "The request was cancelled and Gemini was told to stop."));
+      timers.push(
+        setTimeout(
+          () => stop(
+            new BridgeError(
+              "timeout",
+              `Gemini did not finish within the ${Math.round(req.timeoutMs / 1e3)}s budget; the request was cancelled.`
+            )
+          ),
+          Math.max(0, deadline - this.now())
+        )
+      );
+      if (req.signal?.aborted) onAbort();
+      else req.signal?.addEventListener("abort", onAbort, { once: true });
+      if (done) return;
+      connection.request("session/prompt", { sessionId, prompt: [{ type: "text", text: prompt }] }).then(
+        (value) => {
+          settled = true;
+          finish(null, value);
+        },
+        (err) => {
+          settled = true;
+          finish(err instanceof Error ? err : new Error(String(err)));
+        }
+      );
+    });
+  }
+  markUnhealthy(err) {
+    this.unhealthyUntil = this.now() + UNHEALTHY_MS;
+    this.lastError = errorMessage(err);
+    void this.close();
+  }
+  evictOldSessions() {
+    if (this.sessions.size <= MAX_SESSIONS) return;
+    const oldest = [...this.sessions.entries()].sort((a, b) => a[1] - b[1]).slice(0, this.sessions.size - MAX_SESSIONS);
+    for (const [sessionId] of oldest) {
+      this.sessions.delete(sessionId);
+      this.connection?.request("session/close", { sessionId }).catch(() => void 0);
+    }
+  }
+  scheduleIdle() {
+    this.clearIdle();
+    this.idleTimer = setTimeout(() => void this.close(), IDLE_MS);
+    this.idleTimer.unref();
+  }
+  clearIdle() {
+    if (this.idleTimer) clearTimeout(this.idleTimer);
+    this.idleTimer = void 0;
+  }
+};
+function modelUsed(result) {
+  const usage = result._meta?.quota?.model_usage;
+  const model = usage?.[usage.length - 1]?.model;
+  return typeof model === "string" ? model : null;
+}
+function withTimeout(promise2, ms, message) {
+  let timer;
+  const timeout = new Promise((_, reject) => {
+    timer = setTimeout(() => reject(new Error(message)), ms);
+  });
+  return Promise.race([promise2, timeout]).finally(() => clearTimeout(timer));
+}
+function lastLine(text) {
+  return text.split(/\r?\n/).map((line) => line.trim()).filter((line) => line && !/^at\s/.test(line)).pop() ?? "";
+}
+
+// src/history.ts
+import fs5 from "node:fs/promises";
+import path5 from "node:path";
+var History = class {
+  constructor(file2, keep = 500) {
+    this.file = file2;
+    this.keep = keep;
+  }
+  file;
+  keep;
+  appends = 0;
+  async append(entry) {
+    await fs5.mkdir(path5.dirname(this.file), { recursive: true });
+    await fs5.appendFile(this.file, `${JSON.stringify(entry)}
+`, "utf8");
+    if (++this.appends % 50 === 0) await this.trim();
+  }
+  async recent(since) {
+    const text = await fs5.readFile(this.file, "utf8").catch(() => "");
+    const entries = [];
+    for (const line of text.split("\n")) {
+      if (!line.trim()) continue;
+      try {
+        const entry = JSON.parse(line);
+        if (Date.parse(entry.at) >= since.getTime()) entries.push(entry);
+      } catch {
+      }
+    }
+    return entries;
+  }
+  async trim() {
+    const text = await fs5.readFile(this.file, "utf8").catch(() => "");
+    const lines = text.split("\n").filter((line) => line.trim());
+    if (lines.length <= this.keep) return;
+    const tmp = `${this.file}.${process.pid}.tmp`;
+    await fs5.writeFile(tmp, `${lines.slice(-this.keep).join("\n")}
+`, "utf8");
+    await fs5.rename(tmp, this.file);
+  }
+};
+function summarizeHistory(entries) {
+  const byModel = {};
+  let okTotalMs = 0;
+  let okCount = 0;
+  for (const entry of entries) {
+    for (const attempt of entry.attempts) {
+      const stats = byModel[attempt.model] ??= { ok: 0, failed: 0, totalMs: 0 };
+      if (attempt.outcome === "ok") {
+        stats.ok++;
+        stats.totalMs += attempt.ms;
+      } else {
+        stats.failed++;
+      }
+    }
+    if (entry.ok && entry.engine !== "cache") {
+      okTotalMs += entry.durationMs;
+      okCount++;
+    }
+  }
   return {
-    store,
-    invoke: (req) => invokeGemini(req),
-    refreshCli: (force) => refreshCliStatus(store, { force }),
-    projectDir: () => workspaceRoot(),
-    scratchDir: async () => {
-      const dir = scratchWorkspaceDir();
-      await fs4.mkdir(dir, { recursive: true });
-      return dir;
-    },
-    now: () => /* @__PURE__ */ new Date()
+    calls: entries.length,
+    ok: entries.filter((e) => e.ok).length,
+    cached: entries.filter((e) => e.engine === "cache").length,
+    failed: entries.filter((e) => !e.ok).length,
+    avgMs: okCount > 0 ? Math.round(okTotalMs / okCount) : 0,
+    byModel: Object.fromEntries(
+      Object.entries(byModel).map(([model, s]) => [model, { ok: s.ok, failed: s.failed, avgMs: s.ok > 0 ? Math.round(s.totalMs / s.ok) : 0 }])
+    )
   };
 }
 
-// src/gemini/promptBuilder.ts
-var MODE_PREFIXES = {
-  ask: "",
-  analyze: "Analysis task. Examine the provided material and explain what matters in it: for code, its structure, responsibilities, data flow and notable design decisions; for logs or data, what happened and what stands out. Be concrete and cite specific files, lines or timestamps.",
-  review: "Critical code review. Identify bugs, edge cases, security issues, performance problems and maintainability risks. Rank findings by severity, cite specific files and lines, and suggest a fix for each. Skip praise and generic advice.",
-  refactor: "Refactoring proposal. Suggest behavior-preserving improvements to structure, naming, duplication, clarity and performance. Show the proposed code and briefly justify each change. Do not apply the changes yourself.",
-  plan: "Implementation planning. Produce a concise, ordered plan: the files to create or change, what changes in each, risks, and open questions.",
-  test: "Test design. Propose test cases covering the happy path, edge cases and failure modes, and write the test code using the project's existing test framework and conventions where visible."
+// src/jobs.ts
+import crypto2 from "node:crypto";
+var JobManager = class {
+  constructor(now = Date.now, keepMs = 60 * 6e4, maxJobs = 50) {
+    this.now = now;
+    this.keepMs = keepMs;
+    this.maxJobs = maxJobs;
+  }
+  now;
+  keepMs;
+  maxJobs;
+  jobs = /* @__PURE__ */ new Map();
+  start(label, run, onError) {
+    this.prune();
+    const job = {
+      id: crypto2.randomBytes(4).toString("hex"),
+      label,
+      status: "running",
+      startedAt: this.now(),
+      finishedAt: null,
+      result: null,
+      done: Promise.resolve()
+    };
+    job.done = run().catch(onError).then((result) => {
+      job.result = result;
+      job.status = "done";
+      job.finishedAt = this.now();
+    });
+    this.jobs.set(job.id, job);
+    return job;
+  }
+  get(id) {
+    return this.jobs.get(id);
+  }
+  list() {
+    return [...this.jobs.values()].sort((a, b) => b.startedAt - a.startedAt);
+  }
+  running() {
+    return [...this.jobs.values()].filter((job) => job.status === "running").length;
+  }
+  /** Resolves when the job finishes or after `ms`, whichever comes first. */
+  async wait(job, ms) {
+    if (job.status === "done" || ms <= 0) return job;
+    let timer;
+    await Promise.race([job.done, new Promise((resolve) => timer = setTimeout(resolve, ms))]);
+    clearTimeout(timer);
+    return job;
+  }
+  prune() {
+    const cutoff = this.now() - this.keepMs;
+    for (const [id, job] of this.jobs) {
+      if (job.status === "done" && (job.finishedAt ?? 0) < cutoff) this.jobs.delete(id);
+    }
+    const finished = this.list().filter((job) => job.status === "done");
+    for (const job of finished.slice(Math.max(0, this.maxJobs - 1))) this.jobs.delete(job.id);
+  }
 };
-var GUARDRAIL = "Respond in plain text only (Markdown and code blocks are fine). Use your read-only tools freely \u2014 reading files, listing and searching \u2014 but change nothing: no file edits, no writes, no shell commands. Be concise: your answer is read by another AI assistant with a limited context window.";
+
+// src/context.ts
+function createContext(store = new StateStore()) {
+  const scratchDir = async () => {
+    const dir = scratchWorkspaceDir();
+    await fs6.mkdir(dir, { recursive: true });
+    return dir;
+  };
+  const home = stateDir();
+  return {
+    store,
+    invoke: (req) => invokeGemini(req),
+    acp: new AcpEngine({ cwd: scratchDir, projectDir: () => projectDirForGemini(workspaceRoot()) }),
+    cache: new ResponseCache(path6.join(home, "cache")),
+    history: new History(path6.join(home, "history.jsonl")),
+    jobs: new JobManager(),
+    refreshCli: (force) => refreshCliStatus(store, { force }),
+    projectDir: () => workspaceRoot(),
+    scratchDir,
+    now: () => /* @__PURE__ */ new Date(),
+    sleep: (ms) => new Promise((resolve) => setTimeout(resolve, ms))
+  };
+}
+
+// src/tools/ask.ts
+import fs7 from "node:fs/promises";
+
+// src/gemini/attachments.ts
+import fsp2 from "node:fs/promises";
+
+// src/gemini/atSyntax.ts
 function toAtReference(absolutePath, platform = process.platform) {
   if (platform === "win32") return `@"${absolutePath}"`;
   return `@${absolutePath.replace(/([ \t()[\]{};,|*?$`'"#&<>!~\\])/g, "\\$1")}`;
@@ -37811,29 +38620,178 @@ function toAtReference(absolutePath, platform = process.platform) {
 function escapeAtSigns(text) {
   return text.replace(/(?<!\\)@/g, "\\@");
 }
+
+// src/gemini/attachments.ts
+var INLINE_BUDGET_BYTES = 6 * 1024 * 1024;
+var INLINE_GROWTH = 1.15;
+async function prepareAttachments(targets, budgetBytes = INLINE_BUDGET_BYTES) {
+  const inline = [];
+  const referenced = [];
+  let remaining = budgetBytes;
+  for (const target of targets) {
+    if (target.isDirectory) {
+      referenced.push({ path: target.absolute, lines: null, isDirectory: true });
+      continue;
+    }
+    const file2 = await readText(target.absolute, remaining);
+    if (file2.kind === "text") {
+      const numbered = numberLines(file2.content);
+      inline.push({ path: target.absolute, lines: numbered.lines, text: numbered.text });
+      remaining -= Buffer.byteLength(numbered.text, "utf8");
+    } else {
+      const lines = file2.kind === "too_big" ? await countLines(target.absolute) : null;
+      referenced.push({ path: target.absolute, lines, isDirectory: false });
+    }
+  }
+  return { inline, referenced, inlineBytes: budgetBytes - remaining };
+}
+async function readText(file2, budget) {
+  const { size } = await fsp2.stat(file2);
+  if (size * INLINE_GROWTH > budget) return { kind: "too_big" };
+  const buffer = await fsp2.readFile(file2);
+  if (buffer.includes(0)) return { kind: "binary" };
+  const content = buffer.toString("utf8");
+  return { kind: "text", content: content.charCodeAt(0) === 65279 ? content.slice(1) : content };
+}
+function numberLines(content) {
+  if (content === "") return { text: "", lines: 0 };
+  const lines = content.split(/\r?\n/);
+  if (lines.length > 1 && lines[lines.length - 1] === "") lines.pop();
+  return { text: lines.map((line, i) => `${i + 1}: ${escapeAtSigns(line)}`).join("\n"), lines: lines.length };
+}
+
+// src/gemini/promptBuilder.ts
+var MODE_PREFIXES = {
+  ask: "Task:",
+  summarize: "Summary task. Report the key facts and anything that looks wrong, most important first. For logs: whether the run succeeded, and every error or warning with its line number and timestamp. For documents: the main points and decisions.",
+  analyze: "Analysis task. Examine the provided material and explain what matters in it: for code, its structure, responsibilities, data flow and notable design decisions; for logs or data, what happened and what stands out. Be concrete and cite specific files, lines or timestamps.",
+  review: "Critical code review. Report only problems you can point to in the code: file, line, what is wrong, why it matters and a concrete fix. Rank them critical (bugs, security), major or minor. Skip praise, style nitpicks and generic advice.",
+  refactor: "Refactoring proposal. Suggest behavior-preserving improvements to structure, naming, duplication, clarity and performance. Show the proposed code and briefly justify each change. Do not apply the changes yourself.",
+  plan: "Implementation planning. Produce a concise, ordered plan: the files to create or change, what changes in each, risks, and open questions.",
+  test: "Test design. Propose test cases covering the happy path, edge cases and failure modes, and write the test code using the project's existing test framework and conventions where visible."
+};
+var FOLLOW_UP_HEADER = "Follow-up question about the material and answer above:";
+var GUARDRAIL = "Respond in plain text only (Markdown and code blocks are fine). Use your read-only tools freely \u2014 reading files, listing and searching \u2014 but change nothing: no file edits, no writes, no shell commands. Cite file names and line numbers for specific claims so they can be checked. Be concise: your answer is read by another AI assistant with a limited context window.";
 var ATTACHED_LINE_LIMIT = 2e3;
-var TRUNCATION_NOTICE = `Only the first ${ATTACHED_LINE_LIMIT} lines of each file are attached. If a file listed above as partly attached matters for this task, you MUST read its remaining lines yourself before answering \u2014 your read-only file tools can read any line range, and reading is allowed. Never conclude anything (such as "no errors") from the attached excerpt alone, and state plainly which parts you could not read.`;
+var TRUNCATION_NOTICE = `Only the first ${ATTACHED_LINE_LIMIT} lines of each referenced file are attached. If a file listed above as partly attached matters for this task, you MUST read its remaining lines yourself before answering \u2014 your read-only file tools can read any line range, and reading is allowed. Never conclude anything (such as "no errors") from the attached excerpt alone, and state plainly which parts you could not read.`;
+var INLINE_INTRO = "Attached files, complete. Every line starts with its line number and a colon. Inside file content each at-sign is preceded by a backslash (an escape the Gemini CLI requires); ignore that backslash.";
 function fileReferenceLine(file2, platform = process.platform) {
   const reference = toAtReference(file2.path, platform);
   if (file2.lines == null) return reference;
   return file2.lines > ATTACHED_LINE_LIMIT ? `${reference} (${file2.lines} lines, only the first ${ATTACHED_LINE_LIMIT} attached)` : `${reference} (${file2.lines} lines)`;
 }
-function buildPrompt({ prompt, mode, files, platform }) {
-  const sections = [];
-  const prefix = MODE_PREFIXES[mode];
-  if (prefix) sections.push(prefix);
-  sections.push(escapeAtSigns(prompt.trim()));
-  if (files.length > 0) {
+function buildPrompt(input2) {
+  const inline = input2.inline ?? [];
+  const referenced = input2.referenced ?? [];
+  const sections = [input2.followUp ? FOLLOW_UP_HEADER : MODE_PREFIXES[input2.mode], escapeAtSigns(input2.prompt.trim())];
+  if (input2.format?.trim()) sections.push(`Answer format: ${escapeAtSigns(input2.format.trim())}`);
+  if (inline.length > 0) sections.push(inlineSection(inline));
+  if (referenced.length > 0) {
     sections.push(
       [
-        "Referenced files and folders (their contents are attached):",
-        ...files.map((file2) => fileReferenceLine(file2, platform)),
+        "Referenced files and folders (attached by the Gemini CLI):",
+        ...referenced.map((file2) => fileReferenceLine(file2, input2.platform)),
         TRUNCATION_NOTICE
       ].join("\n")
     );
   }
   sections.push(GUARDRAIL);
   return sections.join("\n\n");
+}
+function inlineSection(files) {
+  const blocks = files.map((file2, i) => {
+    const n = `${i + 1} of ${files.length}`;
+    return [`===== FILE ${n}: ${escapeAtSigns(file2.path)} (${file2.lines} lines) =====`, file2.text, `===== END OF FILE ${i + 1} =====`].filter((part) => part !== "").join("\n");
+  });
+  return [INLINE_INTRO, ...blocks].join("\n\n");
+}
+
+// src/gemini/runner.ts
+var MIN_ATTEMPT_MS = 4e3;
+var TRANSIENT_RETRY_DELAY_MS = 2e3;
+async function runGemini(ctx, req) {
+  const state = await ctx.store.read();
+  const deadline = ctx.now().getTime() + req.timeoutMs;
+  const plan = planChain(req.chain, state.modelCooldowns, ctx.now(), req.explicitModel);
+  const attempts = [];
+  const preference = state.preferences.engine;
+  let useAcp = ctx.acp !== null && preference !== "cli" && req.acpEligible && ctx.acp.isHealthy() && (!req.conversationId || ctx.acp.hasSession(req.conversationId));
+  let index = 0;
+  let retriedTransient = false;
+  while (index < plan.tryOrder.length) {
+    const model = plan.tryOrder[index];
+    const remaining = deadline - ctx.now().getTime();
+    if (attempts.length > 0 && remaining < MIN_ATTEMPT_MS) break;
+    const engine = useAcp ? "acp" : "cli";
+    const startedAt = ctx.now().getTime();
+    const failFast = index < plan.tryOrder.length - 1;
+    req.onProgress?.(`Asking ${model}${engine === "acp" ? " (warm process)" : ""}\u2026`);
+    try {
+      const response = engine === "acp" ? await ctx.acp.run({
+        prompt: req.prompt,
+        model,
+        timeoutMs: remaining,
+        signal: req.signal,
+        sessionId: req.conversationId,
+        failFast,
+        onNotice: req.onProgress
+      }) : await ctx.invoke({
+        prompt: req.prompt,
+        model,
+        yolo: req.yolo,
+        timeoutMs: remaining,
+        cwd: req.cwd,
+        includeDirectories: req.includeDirectories,
+        signal: req.signal,
+        resumeSessionId: req.conversationId,
+        failFast,
+        onNotice: req.onProgress
+      });
+      attempts.push({ model, engine, outcome: "ok", ms: ctx.now().getTime() - startedAt });
+      return { response, engine, attempts, skipped: plan.skipped };
+    } catch (err) {
+      const error62 = asBridgeError(err);
+      const ms = ctx.now().getTime() - startedAt;
+      const failure2 = error62.details.failure;
+      if (failure2 === "engine") {
+        attempts.push({ model, engine, outcome: "engine", ms, detail: error62.message });
+        useAcp = false;
+        req.onProgress?.("The warm Gemini process is unavailable; using a one-off process.");
+        continue;
+      }
+      if (error62.type === "quota" || failure2 === "unavailable") {
+        const cooldown = cooldownFor(failure2 === "unavailable" ? "unavailable" : error62.details.quota, ctx.now());
+        await ctx.store.update((s) => {
+          s.modelCooldowns[model] = cooldown;
+        }).catch(() => void 0);
+        attempts.push({ model, engine, outcome: failure2 === "unavailable" ? "unavailable" : "quota", ms, detail: cooldown.reason });
+        const next = plan.tryOrder[index + 1];
+        if (next) req.onProgress?.(`${model}: ${cooldown.reason} \u2014 trying ${next}\u2026`);
+        index++;
+        retriedTransient = false;
+        continue;
+      }
+      if (failure2 === "transient" && !retriedTransient && deadline - ctx.now().getTime() > MIN_ATTEMPT_MS + TRANSIENT_RETRY_DELAY_MS) {
+        retriedTransient = true;
+        attempts.push({ model, engine, outcome: "transient", ms, detail: error62.message });
+        req.onProgress?.(`${model}: temporary error, retrying once\u2026`);
+        await ctx.sleep(TRANSIENT_RETRY_DELAY_MS);
+        continue;
+      }
+      attempts.push({ model, engine, outcome: "error", ms, detail: error62.message });
+      throw new BridgeError(error62.type, error62.message, { ...error62.details, attempts });
+    }
+  }
+  throw new BridgeError("quota", describeExhaustion(attempts, plan.skipped), { attempts, skipped: plan.skipped });
+}
+function describeExhaustion(attempts, skipped) {
+  const tried = attempts.filter((a) => a.outcome !== "ok").map((a) => `${a.model} (${a.detail ?? a.outcome})`);
+  const cooling = skipped.map((s) => `${s.model} (${s.reason}, until ${s.until})`);
+  const parts = [
+    tried.length > 0 ? `tried ${tried.join("; ")}` : "",
+    cooling.length > 0 ? `skipped ${cooling.join("; ")}` : ""
+  ].filter(Boolean);
+  return `No Gemini model could answer: ${parts.join(". ") || "the time budget ran out"}.`;
 }
 
 // src/tools/result.ts
@@ -37851,9 +38809,6 @@ Next step: ${nextStep}` }],
     structuredContent: { ok: false, errorType: type, message, nextStep, ...details }
   };
 }
-function toBridgeError(err) {
-  return err instanceof BridgeError ? err : new BridgeError("gemini_error", errorMessage(err));
-}
 function withWarning(result, warning) {
   if (!warning) return result;
   return { ...result, content: [{ type: "text", text: `Warning: ${warning}` }, ...result.content] };
@@ -37861,23 +38816,39 @@ function withWarning(result, warning) {
 
 // src/tools/ask.ts
 var MAX_PATHS = 20;
-var MODEL_PATTERN = /^[A-Za-z0-9][A-Za-z0-9._:/-]*$/;
-var ASK_DESCRIPTION = 'Delegate a self-contained task to Google Gemini (via the user\'s local, already signed-in gemini CLI) to save your own context and tokens. Good fits: summarizing or analyzing large files, logs or many files at once; broad codebase questions; second-opinion code reviews; drafting boilerplate, docs or tests; implementation plans. Pass files and folders in `paths` and do NOT read them yourself first: Gemini reads them directly, so their contents never enter this conversation. Gemini sees only `prompt` and `paths` (not this conversation), so make the prompt stand alone. It returns text only and never edits files; you apply any changes. Not worth it for small files or quick questions you can answer directly. If the result has errorType "disabled", do the task yourself.';
+var HEARTBEAT_MS = 1e4;
+var ASK_DESCRIPTION = [
+  "Delegate a self-contained task to Google Gemini (via the user's local, signed-in gemini CLI) to save your own context and tokens.",
+  "Good fits: summarizing or analyzing large files, logs or many files; broad codebase questions; second-opinion reviews; drafting boilerplate, docs or tests; plans.",
+  "Pass files and folders in `paths` and do NOT read them yourself first: the bridge hands them to Gemini, so their contents never enter this conversation.",
+  "Gemini sees only `prompt` and `paths` (not this conversation): make the prompt stand alone and use `format` to say exactly what you need back.",
+  "Independent tasks can run as parallel gemini_ask calls; for long ones pass background: true and collect the answer with gemini_result.",
+  "Gemini only returns text; you apply any changes. Its citations can be slightly off, so before relying on a specific line or value, read just those lines.",
+  "Answers end with a followUp id: pass it as `followUp` to ask more about the same material without resending it.",
+  'Not worth it for small files or quick questions. If the result has errorType "disabled", do the task yourself.'
+].join(" ");
 var askInputSchema = {
   prompt: external_exports.string().min(1).describe("The task for Gemini, written to stand alone: include any context it needs. Refer to attached files by name."),
   paths: external_exports.array(external_exports.string().min(1)).max(MAX_PATHS).optional().describe(
-    `Files or folders for Gemini to read directly (max ${MAX_PATHS}). Absolute paths preferred; relative ones resolve against the project folder. Folders are read recursively, so prefer specific files or subfolders.`
+    `Files or folders for Gemini (max ${MAX_PATHS}). Absolute paths preferred; relative ones resolve against the project folder. Files are sent complete with line numbers; folders are read recursively, so prefer specific files.`
   ),
   mode: external_exports.enum(MODES).optional().describe(
-    "Framing preset. ask (default): general. analyze: explain code or architecture. review: critical code review citing files and lines. refactor: behavior-preserving improvement proposals. plan: ordered implementation plan. test: test cases plus test code."
+    "Framing preset. ask (default): general. summarize: key facts, errors with line numbers. analyze: explain code or data. review: critical review citing files and lines. refactor: behavior-preserving proposals. plan: ordered implementation plan. test: test cases plus code. review/refactor/plan/test use the strongest model with quota; the others the fastest."
   ),
-  model: external_exports.string().regex(MODEL_PATTERN, "Model names contain only letters, digits and . _ : / -").optional().describe("Gemini model override. Omit to use the Gemini CLI's default (recommended)."),
-  timeoutMs: external_exports.number().int().min(MIN_TIMEOUT_MS).max(MAX_TIMEOUT_MS).optional().describe("Hard timeout in milliseconds (default 180000). When it expires the whole Gemini process tree is killed."),
+  format: external_exports.string().max(500).optional().describe('What you need back, e.g. "5 bullets", "only issues as file:line \u2014 problem \u2014 fix", "max 200 words". Short, targeted answers cost you fewer tokens.'),
+  followUp: external_exports.string().regex(/^[A-Za-z0-9_-]{8,128}$/, "Use the followUp id printed at the end of an earlier answer").optional().describe("The followUp id from an earlier answer: continues that conversation, so Gemini still has its files and answer. Don't resend the same paths."),
+  background: external_exports.boolean().optional().describe("Return immediately with a jobId and let Gemini work while you continue; collect the answer with gemini_result."),
+  fresh: external_exports.boolean().optional().describe("Ask Gemini again even if an identical question about the same files was answered recently."),
+  model: external_exports.string().regex(MODEL_PATTERN, "Model names contain only letters, digits and . _ : / -").optional().describe("Try this Gemini model first (the preference chain still backs it up). Omit to let the bridge pick (recommended)."),
+  timeoutMs: external_exports.number().int().min(MIN_TIMEOUT_MS).max(MAX_TIMEOUT_MS).optional().describe("Hard time budget in milliseconds, fallbacks included (default 180000). When it runs out, Gemini is stopped."),
   yolo: external_exports.boolean().optional().describe(
     "Auto-approve Gemini's own tool calls (e.g. web fetches). Default false. Gemini is still told not to edit files or run commands. Only set this if the user asks."
   )
 };
-async function handleAsk(ctx, args, signal) {
+async function handleAsk(ctx, args, options = {}) {
+  return args.background ? startBackground(ctx, args) : executeAsk(ctx, args, options);
+}
+async function executeAsk(ctx, args, options = {}) {
   const state = await ctx.store.read();
   const warning = ctx.store.takeWarning();
   if (!state.enabled) {
@@ -37885,72 +38856,219 @@ async function handleAsk(ctx, args, signal) {
   }
   const mode = args.mode ?? "ask";
   const startedAt = ctx.now().getTime();
+  const elapsed = () => ctx.now().getTime() - startedAt;
+  const call = { mode, background: options.background ?? false };
+  let attachments = { inline: [], referenced: [], inlineBytes: 0 };
   try {
     const { resolved, missing } = await resolveInputPaths(args.paths ?? [], ctx.projectDir());
     if (missing.length > 0) {
       throw new BridgeError("invalid_paths", `These paths do not exist: ${missing.join("; ")}`, { missing });
     }
-    const [fileChars, cwd, files] = await Promise.all([
+    const [fileChars, cwd, prepared] = await Promise.all([
       estimateChars(resolved),
       ctx.scratchDir(),
-      Promise.all(
-        resolved.map(async (p) => ({
-          path: p.absolute,
-          lines: p.isDirectory ? null : await countLines(p.absolute)
-        }))
-      )
+      prepareAttachments(resolved)
     ]);
-    const response = await ctx.invoke({
-      prompt: buildPrompt({ prompt: args.prompt, mode, files }),
-      model: args.model ?? state.preferences.model ?? void 0,
-      yolo: args.yolo ?? state.preferences.approvalMode === "yolo",
-      timeoutMs: args.timeoutMs ?? state.preferences.timeoutMs,
-      cwd,
-      includeDirectories: includeDirectoriesFor(resolved, ctx.projectDir()),
-      signal
+    attachments = prepared;
+    const prompt = buildPrompt({
+      prompt: args.prompt,
+      mode,
+      format: args.format,
+      inline: prepared.inline,
+      referenced: prepared.referenced,
+      followUp: Boolean(args.followUp)
     });
+    const yolo = args.yolo ?? state.preferences.approvalMode === "yolo";
+    const cacheTtlMs = state.preferences.cacheTtlMinutes * 6e4;
+    const cacheKey = cacheTtlMs > 0 && !args.followUp && !prepared.referenced.some((file2) => file2.isDirectory) ? ResponseCache.key({
+      v: 2,
+      prompt,
+      model: args.model ?? null,
+      yolo,
+      refs: await fingerprints(prepared.referenced.map((file2) => file2.path))
+    }) : null;
+    if (cacheKey && !args.fresh) {
+      const cached2 = await ctx.cache.get(cacheKey, cacheTtlMs, ctx.now());
+      if (cached2) {
+        const charsSaved2 = Math.max(0, fileChars - cached2.text.length);
+        await record2(ctx, { ...call, ok: true, engine: "cache", model: cached2.model, durationMs: elapsed(), attempts: [], attachments, charsSaved: charsSaved2 });
+        return withWarning(textResult(`${cached2.text}
+
+${cachedFooter(mode, cached2)}`), warning);
+      }
+    }
+    options.report?.(describeAttachments(prepared));
+    const heartbeat = options.report ? setInterval(() => options.report?.(`Gemini is still working\u2026 ${Math.round(elapsed() / 1e3)}s`), HEARTBEAT_MS) : void 0;
+    let outcome;
+    try {
+      outcome = await runGemini(ctx, {
+        prompt,
+        chain: modelChain(state.preferences, mode, args.model),
+        explicitModel: args.model,
+        timeoutMs: args.timeoutMs ?? state.preferences.timeoutMs,
+        yolo,
+        cwd,
+        includeDirectories: includeDirectoriesFor(resolved, ctx.projectDir()),
+        acpEligible: prepared.referenced.length === 0 && !yolo,
+        conversationId: args.followUp,
+        signal: options.signal,
+        onProgress: options.report
+      });
+    } finally {
+      if (heartbeat) clearInterval(heartbeat);
+    }
+    const { response } = outcome;
     const charsSaved = Math.max(0, fileChars - response.text.length);
-    const tokensSaved = Math.round(charsSaved / CHARS_PER_TOKEN);
-    await ctx.store.update((s) => {
-      recordCall(s, mode, ctx.now());
-      s.usage.estimatedCharsSaved += charsSaved;
-      s.geminiCli.lastAuthOk = true;
-      s.geminiCli.lastAuthCheckAt = ctx.now().toISOString();
-      s.geminiCli.lastAuthDetail = "The last Gemini call succeeded.";
-    }).catch(() => void 0);
+    await record2(ctx, {
+      ...call,
+      ok: true,
+      engine: outcome.engine,
+      model: response.model,
+      durationMs: elapsed(),
+      attempts: outcome.attempts,
+      attachments,
+      charsSaved
+    });
+    if (cacheKey) {
+      await ctx.cache.set(cacheKey, {
+        text: response.text,
+        model: response.model,
+        createdAt: ctx.now().toISOString(),
+        durationMs: response.durationMs,
+        conversationId: response.sessionId
+      }).catch(() => void 0);
+    }
     const cliWarnings = response.warnings.length > 0 ? `
 
 Gemini CLI warnings:
 ${response.warnings.join("\n")}` : "";
-    const footer = `
+    return withWarning(textResult(`${response.text}${cliWarnings}
 
-[gemini-claude-bridge \xB7 ${mode} \xB7 ${response.model ?? "default model"} \xB7 ${(response.durationMs / 1e3).toFixed(1)}s` + (tokensSaved > 0 ? ` \xB7 ~${tokensSaved} tokens of file content kept out of Claude's context]` : "]");
-    return withWarning(textResult(response.text + cliWarnings + footer), warning);
+${answerFooter(mode, outcome, charsSaved)}`), warning);
   } catch (err) {
-    const error62 = toBridgeError(err);
-    await ctx.store.update((s) => {
-      recordCall(s, mode, ctx.now());
-      s.usage.totalErrors += 1;
-      const stamp = ctx.now().toISOString();
-      if (error62.type === "not_authenticated") {
-        s.geminiCli.lastAuthOk = false;
-        s.geminiCli.lastAuthCheckAt = stamp;
-        s.geminiCli.lastAuthDetail = error62.message;
-      } else if (error62.type === "not_installed") {
-        s.geminiCli.lastDetectedVersion = null;
-        s.geminiCli.lastInstalledCheckAt = stamp;
-      }
-    }).catch(() => void 0);
+    const error62 = asBridgeError(err);
+    const attempts = Array.isArray(error62.details.attempts) ? error62.details.attempts : [];
+    await record2(ctx, {
+      ...call,
+      ok: false,
+      engine: attempts[attempts.length - 1]?.engine ?? "none",
+      model: null,
+      durationMs: elapsed(),
+      attempts,
+      attachments,
+      charsSaved: 0,
+      error: error62
+    });
+    const { attempts: _full, skipped, ...details } = error62.details;
     return withWarning(
-      errorResult(error62.type, error62.message, { mode, durationMs: ctx.now().getTime() - startedAt, ...error62.details }),
+      errorResult(error62.type, error62.message, {
+        mode,
+        durationMs: elapsed(),
+        ...details,
+        ...attempts.length > 0 ? { attempts: attempts.map(({ model, outcome, detail }) => ({ model, outcome, detail })) } : {},
+        ...Array.isArray(skipped) && skipped.length > 0 ? { skipped } : {}
+      }),
       warning
     );
   }
 }
-function recordCall(state, mode, when) {
-  state.usage.totalCalls += 1;
-  state.usage.callsByMode[mode] = (state.usage.callsByMode[mode] ?? 0) + 1;
-  state.usage.lastUsedAt = when.toISOString();
+async function startBackground(ctx, args) {
+  const state = await ctx.store.read();
+  if (!state.enabled) return errorResult("disabled", "The Gemini bridge is turned off, so nothing was sent to Gemini.");
+  const { missing } = await resolveInputPaths(args.paths ?? [], ctx.projectDir());
+  if (missing.length > 0) return errorResult("invalid_paths", `These paths do not exist: ${missing.join("; ")}`, { missing });
+  const label = `${args.mode ?? "ask"}: ${truncate(args.prompt, 80)}`;
+  const job = ctx.jobs.start(
+    label,
+    () => executeAsk(ctx, { ...args, background: false }, { background: true }),
+    (err) => errorResult("gemini_error", asBridgeError(err).message)
+  );
+  const message = `Started background Gemini job ${job.id} (${label}). Keep working; collect the answer with gemini_result({ jobId: "${job.id}", waitSeconds: 60 }).`;
+  return textResult(message, { message, jobId: job.id, status: "running" });
+}
+async function record2(ctx, call) {
+  const stamp = ctx.now().toISOString();
+  await ctx.store.update((s) => {
+    s.usage.totalCalls += 1;
+    s.usage.callsByMode[call.mode] = (s.usage.callsByMode[call.mode] ?? 0) + 1;
+    s.usage.lastUsedAt = stamp;
+    s.usage.estimatedCharsSaved += call.charsSaved;
+    if (call.engine === "cache") s.usage.cacheHits += 1;
+    if (!call.ok) s.usage.totalErrors += 1;
+    if (call.ok && call.engine !== "cache") {
+      s.geminiCli.lastAuthOk = true;
+      s.geminiCli.lastAuthCheckAt = stamp;
+      s.geminiCli.lastAuthDetail = "The last Gemini call succeeded.";
+    } else if (call.error?.type === "not_authenticated") {
+      s.geminiCli.lastAuthOk = false;
+      s.geminiCli.lastAuthCheckAt = stamp;
+      s.geminiCli.lastAuthDetail = call.error.message;
+    } else if (call.error?.type === "not_installed") {
+      s.geminiCli.lastDetectedVersion = null;
+      s.geminiCli.lastInstalledCheckAt = stamp;
+    }
+  }).catch(() => void 0);
+  await ctx.history.append({
+    at: stamp,
+    mode: call.mode,
+    ok: call.ok,
+    engine: call.engine,
+    model: call.model,
+    durationMs: call.durationMs,
+    ...call.error ? { errorType: call.error.type } : {},
+    attempts: call.attempts.map(({ model, outcome, ms }) => ({ model, outcome, ms })),
+    inlineFiles: call.attachments.inline.length,
+    referencedFiles: call.attachments.referenced.length,
+    charsSaved: call.charsSaved,
+    background: call.background
+  }).catch(() => void 0);
+}
+function answerFooter(mode, outcome, charsSaved) {
+  const { response, engine, attempts } = outcome;
+  const tokens = Math.round(charsSaved / CHARS_PER_TOKEN);
+  const parts = ["gemini-claude-bridge", mode, response.model ?? "default model", `${(response.durationMs / 1e3).toFixed(1)}s`];
+  if (engine === "acp") parts.push("warm process");
+  if (tokens > 0) parts.push(`~${tokens} tokens of file content kept out of Claude's context`);
+  const lines = [`[${parts.join(" \xB7 ")}]`];
+  const passedOver = attempts.filter((a) => a.outcome === "quota" || a.outcome === "unavailable");
+  if (passedOver.length > 0) lines.push(`[fell back past ${passedOver.map((a) => `${a.model} (${a.detail})`).join("; ")}]`);
+  if (response.sessionId) lines.push(`[followUp: "${response.sessionId}"]`);
+  return lines.join("\n");
+}
+function cachedFooter(mode, cached2) {
+  const lines = [
+    `[gemini-claude-bridge \xB7 ${mode} \xB7 cached answer from ${cached2.createdAt} (${cached2.model ?? "default model"}) \xB7 pass fresh: true to ask Gemini again]`
+  ];
+  if (cached2.conversationId) lines.push(`[followUp: "${cached2.conversationId}"]`);
+  return lines.join("\n");
+}
+function describeAttachments(attachments) {
+  const lines = attachments.inline.reduce((sum, file2) => sum + file2.lines, 0);
+  const parts = [];
+  if (attachments.inline.length > 0) parts.push(`${attachments.inline.length} file(s), ${lines} lines, inline`);
+  if (attachments.referenced.length > 0) parts.push(`${attachments.referenced.length} by reference`);
+  return parts.length > 0 ? `Sending ${parts.join(" and ")} to Gemini\u2026` : "Asking Gemini\u2026";
+}
+async function fingerprints(paths) {
+  return Promise.all(
+    paths.map(async (file2) => {
+      const stat = await fs7.stat(file2).catch(() => null);
+      return [file2, stat?.size ?? -1, stat?.mtimeMs ?? -1];
+    })
+  );
+}
+function truncate(text, max) {
+  const oneLine = text.replace(/\s+/g, " ").trim();
+  return oneLine.length > max ? `${oneLine.slice(0, max - 1)}\u2026` : oneLine;
+}
+function progressReporter(extra) {
+  const progressToken = extra._meta?.progressToken;
+  if (progressToken === void 0) return void 0;
+  let progress = 0;
+  return (message) => {
+    progress += 1;
+    extra.sendNotification({ method: "notifications/progress", params: { progressToken, progress, message } }).catch(() => void 0);
+  };
 }
 function registerAskTool(server, ctx) {
   server.registerTool(
@@ -37961,25 +39079,80 @@ function registerAskTool(server, ctx) {
       inputSchema: askInputSchema,
       annotations: { readOnlyHint: true, openWorldHint: true }
     },
-    (args, extra) => handleAsk(ctx, args, extra.signal)
+    (args, extra) => handleAsk(ctx, args, { signal: extra.signal, report: progressReporter(extra) })
+  );
+}
+
+// src/tools/jobs.ts
+var RESULT_DESCRIPTION = "Collect the answer of a background gemini_ask (one started with background: true). With waitSeconds it waits up to that long for the job to finish. Without jobId it lists this session's background jobs.";
+var resultInputSchema = {
+  jobId: external_exports.string().regex(/^[a-f0-9]{8}$/, "Use the jobId returned by gemini_ask").optional().describe("The jobId returned by gemini_ask with background: true. Omit to list this session's jobs."),
+  waitSeconds: external_exports.number().int().min(0).max(120).optional().describe("Wait up to this many seconds for a running job to finish (default 0: answer right away).")
+};
+async function handleResult2(ctx, args) {
+  const seconds = (job2) => Math.round(((job2.finishedAt ?? ctx.now().getTime()) - job2.startedAt) / 1e3);
+  if (!args.jobId) {
+    const jobs = ctx.jobs.list();
+    const summary = jobs.length === 0 ? "No background Gemini jobs in this session." : jobs.map((job2) => `${job2.id} \xB7 ${job2.status} \xB7 ${seconds(job2)}s \xB7 ${job2.label}`).join("\n");
+    return textResult(summary, {
+      summary,
+      jobs: jobs.map((job2) => ({ jobId: job2.id, status: job2.status, seconds: seconds(job2), label: job2.label }))
+    });
+  }
+  const job = ctx.jobs.get(args.jobId);
+  if (!job) return errorResult("unknown_job", `No background job "${args.jobId}" in this session.`);
+  await ctx.jobs.wait(job, (args.waitSeconds ?? 0) * 1e3);
+  if (job.status === "running" || !job.result) {
+    const message = `Job ${job.id} is still running (${seconds(job)}s so far): ${job.label}. Call gemini_result again later, or pass waitSeconds.`;
+    return textResult(message, { message, jobId: job.id, status: "running" });
+  }
+  return {
+    ...job.result,
+    content: [{ type: "text", text: `Background job ${job.id} (${job.label}) finished after ${seconds(job)}s:` }, ...job.result.content]
+  };
+}
+function registerResultTool(server, ctx) {
+  server.registerTool(
+    "gemini_result",
+    {
+      title: "Collect a background Gemini answer",
+      description: RESULT_DESCRIPTION,
+      inputSchema: resultInputSchema,
+      annotations: { readOnlyHint: true, openWorldHint: false }
+    },
+    (args) => handleResult2(ctx, args)
   );
 }
 
 // src/tools/status.ts
-var STATUS_DESCRIPTION = "Report whether the Gemini bridge is on, whether the gemini CLI is installed and signed in, usage so far (calls, errors, estimated context saved) and current preferences. Use it when the user asks whether the bridge or Gemini is on, set up or working. Works even while the bridge is off.";
+var STATUS_DESCRIPTION = "Report whether the Gemini bridge is on, whether the gemini CLI is installed and signed in, which models are cooling down after running out of quota, recent speed and usage (calls, errors, cache hits, estimated context saved) and current preferences. Use it when the user asks whether the bridge or Gemini is on, set up or working. Works even while the bridge is off.";
 var statusInputSchema = {
   forceRefresh: external_exports.boolean().optional().describe("Re-check the Gemini CLI install and sign-in now instead of reusing the last check (cached up to 10 minutes).")
 };
+var WEEK_MS = 7 * 24 * 60 * 6e4;
 async function handleStatus(ctx, args) {
   const cli = await ctx.refreshCli(args.forceRefresh ?? false);
   const state = await ctx.store.read();
+  const now = ctx.now();
+  const week = summarizeHistory(await ctx.history.recent(new Date(now.getTime() - WEEK_MS)));
+  const cooldowns = activeCooldowns(state, now);
+  const summary = formatStatus({
+    state,
+    cli,
+    week,
+    now,
+    stateFile: ctx.store.file,
+    engine: ctx.acp ? ctx.acp.describe() : "not available",
+    runningJobs: ctx.jobs.running()
+  });
   const usage = { ...state.usage, estimatedTokensSaved: Math.round(state.usage.estimatedCharsSaved / CHARS_PER_TOKEN) };
-  const summary = formatStatus(state, cli, ctx.store.file);
   return withWarning(
     textResult(summary, {
       summary,
       enabled: state.enabled,
       geminiCli: cli,
+      cooldowns,
+      last7Days: week,
       usage,
       preferences: state.preferences,
       stateFile: ctx.store.file
@@ -37987,25 +39160,50 @@ async function handleStatus(ctx, args) {
     ctx.store.takeWarning()
   );
 }
-function formatStatus(state, cli, stateFile) {
+function formatStatus({ state, cli, week, now, stateFile, engine, runningJobs }) {
   const lines = [`Gemini bridge: ${state.enabled ? "ON" : "OFF"}`];
+  const p = state.preferences;
   if (cli.installed) {
     const version2 = cli.version && cli.version !== "unknown" ? ` v${cli.version}` : " (version unknown)";
-    lines.push(`Gemini CLI: installed${version2}${cli.path ? ` at ${cli.path}` : ""}`);
+    const ripgrep = cli.ripgrep ? ` \xB7 ripgrep: ${cli.ripgrep.available ? "yes" : `no (${cli.ripgrep.detail})`}` : "";
+    lines.push(`Gemini CLI: installed${version2}${cli.path ? ` at ${cli.path}` : ""}${ripgrep}`);
     const auth = cli.authOk === true ? "OK" : cli.authOk === false ? "NOT signed in" : "unknown";
     lines.push(`Sign-in: ${auth}${cli.authDetail ? ` (${cli.authDetail})` : ""}`);
   } else {
     lines.push("Gemini CLI: NOT FOUND on PATH. Install it with `npm install -g @google/gemini-cli`, then restart Claude Code.");
   }
+  lines.push(`Engine: ${p.engine} (warm process: ${engine})`);
+  lines.push(
+    `Models: fast tasks ${p.models.fast.join(" \u2192 ")}; strong tasks ${p.models.strong.join(" \u2192 ")}` + (p.model ? `; always first: ${p.model}` : "")
+  );
+  const cooling = activeCooldowns(state, now);
+  lines.push(
+    cooling.length > 0 ? `Cooling down: ${cooling.map((c) => `${c.model} (${c.reason}; until ${shortTime(c.until)})`).join("; ")}` : "Cooling down: none"
+  );
+  if (week.calls > 0) {
+    const models = Object.entries(week.byModel).map(([model, s]) => `${model} ${s.ok} ok${s.failed ? `/${s.failed} failed` : ""}${s.ok ? ` avg ${(s.avgMs / 1e3).toFixed(1)}s` : ""}`).join("; ");
+    lines.push(
+      `Last 7 days: ${plural2(week.calls, "call")} (${week.ok} ok, ${week.cached} cached, ${week.failed} failed)` + (week.avgMs ? `, avg ${(week.avgMs / 1e3).toFixed(1)}s` : "") + (models ? `; ${models}` : "")
+    );
+  }
   const u = state.usage;
   const byMode = Object.entries(u.callsByMode).filter(([, n]) => n > 0).map(([mode, n]) => `${mode} ${n}`).join(", ");
   lines.push(
-    `Usage: ${plural2(u.totalCalls, "call")}, ${plural2(u.totalErrors, "error")}${byMode ? ` (${byMode})` : ""}; ~${compact(u.estimatedCharsSaved)} chars (~${compact(u.estimatedCharsSaved / CHARS_PER_TOKEN)} tokens) of file content kept out of Claude's context` + (u.lastUsedAt ? `; last used ${u.lastUsedAt}` : "")
+    `Usage: ${plural2(u.totalCalls, "call")}, ${plural2(u.totalErrors, "error")}${byMode ? ` (${byMode})` : ""}; ${plural2(u.cacheHits, "cache hit")}; ~${compact(u.estimatedCharsSaved)} chars (~${compact(u.estimatedCharsSaved / CHARS_PER_TOKEN)} tokens) of file content kept out of Claude's context` + (u.lastUsedAt ? `; last used ${u.lastUsedAt}` : "")
   );
-  const p = state.preferences;
-  lines.push(`Preferences: model ${p.model ?? "(Gemini CLI default)"}, timeout ${p.timeoutMs / 1e3}s, approval mode ${p.approvalMode}`);
+  if (runningJobs > 0) lines.push(`Background jobs running: ${runningJobs}`);
+  const suggest = p.suggestDelegation;
+  lines.push(
+    `Preferences: timeout ${p.timeoutMs / 1e3}s, cache ${p.cacheTtlMinutes ? `${p.cacheTtlMinutes} min` : "off"}, suggest delegating files \u2265 ${suggest.minLines} lines: ${suggest.enabled ? "on" : "off"}, approval mode ${p.approvalMode}`
+  );
   lines.push(`State file: ${stateFile}${cli.checkedAt ? ` (CLI last checked ${cli.checkedAt})` : ""}`);
   return lines.join("\n");
+}
+function activeCooldowns(state, now) {
+  return Object.entries(state.modelCooldowns).filter(([, c]) => Date.parse(c.until) > now.getTime()).map(([model, c]) => ({ model, ...c }));
+}
+function shortTime(iso) {
+  return iso.replace(/:\d{2}\.\d{3}Z$/, "Z").replace("T", " ");
 }
 function plural2(n, word) {
   return `${n} ${word}${n === 1 ? "" : "s"}`;
@@ -38057,25 +39255,32 @@ function registerToggleTool(server, ctx) {
   );
 }
 
-// src/version.ts
-var VERSION = true ? "0.1.0" : "dev";
-
 // src/server.ts
 var SERVER_NAME = "gemini-claude-bridge";
 var INSTRUCTIONS = [
   "Gemini bridge: delegate self-contained subtasks to Google Gemini (through the user's local gemini CLI) to save your own context and tokens.",
-  "- gemini_ask: for reading or summarizing large files and logs, analyzing many files, broad codebase questions, second-opinion reviews, drafting boilerplate/tests/docs, and plans. Put the files in `paths` instead of reading them yourself. Gemini sees only the prompt and those files and only returns text; you make any edits. Do small or conversation-dependent tasks yourself.",
+  "- gemini_ask: for summarizing or analyzing large files and logs, many files, broad codebase questions, second-opinion reviews, drafting boilerplate/tests/docs, and plans. Put the files in `paths` instead of reading them yourself, and say in `format` exactly what you need back. Run independent tasks as parallel calls; for long ones pass background: true and collect them with gemini_result while you keep working. Before relying on a specific line or value Gemini cites, read just those lines. Gemini only returns text; you make any edits. Do small or conversation-dependent tasks yourself.",
   '- When the user asks to turn the Gemini bridge (or Gemini delegation) on or off, in any language (e.g. "apag\xE1 el bridge"), call gemini_bridge_toggle. When they ask whether it is on or working, call gemini_bridge_status.'
 ].join("\n");
 function createServer(ctx = createContext()) {
   const server = new McpServer({ name: SERVER_NAME, version: VERSION }, { instructions: INSTRUCTIONS });
   registerAskTool(server, ctx);
+  registerResultTool(server, ctx);
   registerStatusTool(server, ctx);
   registerToggleTool(server, ctx);
   return server;
 }
 async function startServer() {
-  await createServer().connect(new StdioServerTransport());
+  const ctx = createContext();
+  let closing = false;
+  const shutdown = () => {
+    if (closing) return;
+    closing = true;
+    void Promise.resolve(ctx.acp?.close()).finally(() => process.exit(0));
+  };
+  process.stdin.on("end", shutdown);
+  process.stdin.on("close", shutdown);
+  await createServer(ctx).connect(new StdioServerTransport());
 }
 
 // src/index.ts

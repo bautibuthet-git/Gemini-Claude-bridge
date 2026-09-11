@@ -40,6 +40,46 @@ export function getEnv(
 }
 
 /**
+ * Claude Code captures PATH when it starts, so anything installed afterwards (Node, the Gemini
+ * CLI, ripgrep) is invisible to the processes the bridge launches until a restart. Append the
+ * standard install folders that exist but are missing.
+ */
+export function withAugmentedPath(
+  env: NodeJS.ProcessEnv = process.env,
+  platform: NodeJS.Platform = process.platform,
+): NodeJS.ProcessEnv {
+  const key = Object.keys(env).find((k) => k.toUpperCase() === "PATH") ?? "PATH";
+  const separator = platform === "win32" ? ";" : ":";
+  const current = (env[key] ?? "").split(separator).filter(Boolean);
+  const normalize = (dir: string) =>
+    platform === "win32" ? dir.toLowerCase().replace(/[\\/]+$/, "") : dir.replace(/\/+$/, "");
+  const present = new Set(current.map(normalize));
+  const missing = wellKnownBinDirs(env, platform).filter((dir) => !present.has(normalize(dir)) && isDirectory(dir));
+  return missing.length === 0 ? env : { ...env, [key]: [...current, ...missing].join(separator) };
+}
+
+function wellKnownBinDirs(env: NodeJS.ProcessEnv, platform: NodeJS.Platform): string[] {
+  if (platform !== "win32") return ["/usr/local/bin", "/opt/homebrew/bin"];
+  const programFiles = getEnv(env, "ProgramFiles", platform) ?? "C:\\Program Files";
+  const appData = getEnv(env, "APPDATA", platform);
+  const localAppData = getEnv(env, "LOCALAPPDATA", platform);
+  return [
+    path.win32.join(programFiles, "nodejs"),
+    path.win32.join(programFiles, "WinGet", "Links"),
+    ...(appData ? [path.win32.join(appData, "npm")] : []),
+    ...(localAppData ? [path.win32.join(localAppData, "Microsoft", "WinGet", "Links")] : []),
+  ];
+}
+
+function isDirectory(dir: string): boolean {
+  try {
+    return fs.statSync(dir).isDirectory();
+  } catch {
+    return false;
+  }
+}
+
+/**
  * Minimal `which`: resolves a command on PATH without spawning it (honours PATHEXT on
  * Windows). Used for fast "is it installed?" checks, e.g. from the SessionStart hook.
  */
@@ -175,6 +215,11 @@ function expandHome(p: string): string {
   if (p === "~") return os.homedir();
   if (p.startsWith("~/") || p.startsWith("~\\")) return path.join(os.homedir(), p.slice(2));
   return p;
+}
+
+/** The project folder, if it is specific enough to hand to Gemini's own tools; otherwise null. */
+export function projectDirForGemini(dir: string): string | null {
+  return isReasonableProjectDir(dir) ? path.resolve(dir) : null;
 }
 
 /** Excludes folders too broad to hand to Gemini wholesale (filesystem roots, the home folder). */

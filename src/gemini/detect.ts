@@ -3,8 +3,8 @@ import os from "node:os";
 import path from "node:path";
 import type { StateStore } from "../state/store.js";
 import { isErrnoException } from "../util/errors.js";
-import { findOnPath, getEnv } from "../util/paths.js";
-import { geminiCommand, runProcess, type KillFn, type SpawnFn } from "./invoke.js";
+import { findOnPath, getEnv, withAugmentedPath } from "../util/paths.js";
+import { geminiCommand, geminiEnv, runProcess, type KillFn, type SpawnFn } from "./invoke.js";
 
 /** How long install/sign-in checks are reused before being re-run. */
 export const DETECT_TTL_MS = 10 * 60_000;
@@ -22,6 +22,12 @@ export interface AuthCheck {
   detail: string;
 }
 
+export interface RipgrepStatus {
+  available: boolean;
+  path: string | null;
+  detail: string;
+}
+
 export interface CliStatus {
   installed: boolean;
   path: string | null;
@@ -30,6 +36,7 @@ export interface CliStatus {
   authDetail: string | null;
   checkedAt: string | null;
   fromCache: boolean;
+  ripgrep?: RipgrepStatus;
 }
 
 export interface DetectDeps {
@@ -40,7 +47,8 @@ export interface DetectDeps {
 }
 
 export async function detectInstall(deps: DetectDeps = {}): Promise<InstallCheck> {
-  const env = deps.env ?? process.env;
+  // Same PATH the bridge launches Gemini with, so a CLI installed after Claude Code started counts.
+  const env = geminiEnv(deps.env ?? process.env);
   const command = deps.command ?? geminiCommand(env);
   const resolved = findOnPath(command, env);
   if (!resolved) return { installed: false, path: null, version: null };
@@ -54,6 +62,53 @@ export async function detectInstall(deps: DetectDeps = {}): Promise<InstallCheck
       ? { installed: false, path: null, version: null }
       : { installed: true, path: resolved, version: null };
   }
+}
+
+/**
+ * Mirrors the Gemini CLI's own lookup: its bundled binary first, else `rg` on PATH — but only
+ * from a folder it trusts (Windows or Program Files; /usr/bin and the like elsewhere). Without
+ * it, Gemini's searches fall back to a slower built-in grep.
+ */
+export function detectRipgrep(
+  cliPath: string | null,
+  env: NodeJS.ProcessEnv = process.env,
+  platform: NodeJS.Platform = process.platform,
+): RipgrepStatus {
+  const binary = `rg-${platform}-${process.arch}${platform === "win32" ? ".exe" : ""}`;
+  if (cliPath) {
+    const bundle = path.join(path.dirname(cliPath), "node_modules", "@google", "gemini-cli", "bundle");
+    for (const candidate of [path.join(bundle, binary), path.join(bundle, "vendor", "ripgrep", binary)]) {
+      if (fs.existsSync(candidate)) return { available: true, path: candidate, detail: "bundled with the Gemini CLI" };
+    }
+  }
+  const found = findOnPath("rg", withAugmentedPath(env, platform), platform);
+  if (!found) return { available: false, path: null, detail: "not installed, so Gemini's searches use a slower built-in grep" };
+  let real = found;
+  try {
+    real = fs.realpathSync(found);
+  } catch {
+    // keep the PATH entry
+  }
+  return isTrustedSystemPath(real, env, platform)
+    ? { available: true, path: real, detail: "installed" }
+    : { available: false, path: real, detail: "installed outside Program Files, where the Gemini CLI refuses to run it" };
+}
+
+function isTrustedSystemPath(file: string, env: NodeJS.ProcessEnv, platform: NodeJS.Platform): boolean {
+  if (platform === "win32") {
+    const normalize = (p: string) => path.win32.resolve(p).replace(/\\/g, "/").toLowerCase();
+    const target = normalize(file);
+    return [
+      getEnv(env, "SystemRoot", platform) ?? "C:\\Windows",
+      getEnv(env, "ProgramFiles", platform) ?? "C:\\Program Files",
+      getEnv(env, "ProgramFiles(x86)", platform) ?? "C:\\Program Files (x86)",
+    ]
+      .map(normalize)
+      .some((prefix) => target === prefix || target.startsWith(`${prefix}/`));
+  }
+  return ["/usr/bin", "/bin", "/usr/local/bin", "/opt/homebrew/bin", "/opt/homebrew/Cellar", "/usr/local/Cellar", "/usr/sbin", "/sbin"].some(
+    (prefix) => file === prefix || file.startsWith(`${prefix}/`),
+  );
 }
 
 /** The Gemini CLI's config folder. The CLI treats GEMINI_CLI_HOME as a replacement home folder. */
@@ -101,6 +156,7 @@ export interface RefreshOptions {
   detectInstall?: () => Promise<InstallCheck>;
   detectAuth?: () => AuthCheck;
   findPath?: () => string | null;
+  detectRipgrep?: (cliPath: string | null) => RipgrepStatus;
 }
 
 /** Install + sign-in status, re-checked when the cached result is older than the TTL or `force` is set. */
@@ -109,16 +165,20 @@ export async function refreshCliStatus(store: StateStore, opts: RefreshOptions =
   const cached = (await store.read()).geminiCli;
   const lastCheck = cached.lastInstalledCheckAt ? Date.parse(cached.lastInstalledCheckAt) : Number.NaN;
 
+  const ripgrepFor = opts.detectRipgrep ?? ((cliPath: string | null) => detectRipgrep(cliPath));
+
   if (!opts.force && Number.isFinite(lastCheck) && now.getTime() - lastCheck < (opts.ttlMs ?? DETECT_TTL_MS)) {
     const installed = cached.lastDetectedVersion !== null;
+    const cliPath = installed ? (opts.findPath ?? (() => findOnPath(geminiCommand(), geminiEnv())))() : null;
     return {
       installed,
-      path: installed ? (opts.findPath ?? (() => findOnPath(geminiCommand())))() : null,
+      path: cliPath,
       version: cached.lastDetectedVersion,
       authOk: installed ? cached.lastAuthOk : null,
       authDetail: installed ? cached.lastAuthDetail : null,
       checkedAt: cached.lastInstalledCheckAt,
       fromCache: true,
+      ...(installed ? { ripgrep: ripgrepFor(cliPath) } : {}),
     };
   }
 
@@ -146,6 +206,7 @@ export async function refreshCliStatus(store: StateStore, opts: RefreshOptions =
     authDetail: install.installed ? next.geminiCli.lastAuthDetail : null,
     checkedAt: stamp,
     fromCache: false,
+    ...(install.installed ? { ripgrep: ripgrepFor(install.path) } : {}),
   };
 }
 

@@ -4,13 +4,17 @@ import { Client } from "@modelcontextprotocol/sdk/client/index.js";
 import { InMemoryTransport } from "@modelcontextprotocol/sdk/inMemory.js";
 import type { CallToolResult } from "@modelcontextprotocol/sdk/types.js";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
+import { ResponseCache } from "../../src/cache.js";
 import type { BridgeContext } from "../../src/context.js";
 import type { CliStatus } from "../../src/gemini/detect.js";
-import type { GeminiRequest, GeminiResponse } from "../../src/gemini/invoke.js";
-import { toAtReference } from "../../src/gemini/promptBuilder.js";
+import { classifyFailure, type GeminiRequest, type GeminiResponse } from "../../src/gemini/invoke.js";
+import { FOLLOW_UP_HEADER, toAtReference } from "../../src/gemini/promptBuilder.js";
+import { History } from "../../src/history.js";
+import { JobManager } from "../../src/jobs.js";
 import { createServer } from "../../src/server.js";
 import { StateStore } from "../../src/state/store.js";
 import { handleAsk } from "../../src/tools/ask.js";
+import { handleResult } from "../../src/tools/jobs.js";
 import { handleStatus } from "../../src/tools/status.js";
 import { handleToggle } from "../../src/tools/toggle.js";
 import { BridgeError } from "../../src/util/errors.js";
@@ -24,7 +28,10 @@ const CLI: CliStatus = {
   authDetail: "The last Gemini call succeeded.",
   checkedAt: "2026-09-10T12:00:00.000Z",
   fromCache: false,
+  ripgrep: { available: true, path: "C:\\Program Files\\rg.exe", detail: "installed" },
 };
+const SESSION = "11111111-2222-3333-4444-555555555555";
+const ANSWER: GeminiResponse = { text: "Gemini says hi", model: "main-model", durationMs: 1234, exitCode: 0, warnings: [], sessionId: SESSION };
 
 let root: string;
 let project: string;
@@ -41,13 +48,18 @@ beforeEach(async () => {
   project = path.join(root, "project");
   bigFile = path.join(project, "src", "big file.ts");
   await fs.mkdir(path.dirname(bigFile), { recursive: true });
-  await fs.writeFile(bigFile, "x".repeat(40_000));
+  await fs.writeFile(bigFile, Array.from({ length: 1000 }, (_, i) => `const line${i} = ${i}; // padding padding padding`).join("\n"));
 
-  invoke = vi.fn(async () => ({ text: "Gemini says hi", model: "main-pro", durationMs: 1234, exitCode: 0, warnings: [] }));
+  invoke = vi.fn(async () => ({ ...ANSWER }));
   refreshCli = vi.fn(async () => CLI);
+  const state = path.join(root, "state");
   ctx = {
-    store: new StateStore(path.join(root, "state", "state.json")),
+    store: new StateStore(path.join(state, "state.json")),
     invoke,
+    acp: null,
+    cache: new ResponseCache(path.join(state, "cache")),
+    history: new History(path.join(state, "history.jsonl")),
+    jobs: new JobManager(),
     refreshCli,
     projectDir: () => project,
     scratchDir: async () => {
@@ -56,6 +68,7 @@ beforeEach(async () => {
       return dir;
     },
     now: () => new Date("2026-09-10T12:00:00.000Z"),
+    sleep: async () => undefined,
   };
 });
 
@@ -64,34 +77,37 @@ afterEach(async () => {
 });
 
 describe("gemini_ask", () => {
-  it("attaches files as @references, runs from the scratch folder and records usage", async () => {
-    const result = await handleAsk(ctx, { prompt: "Summarize", paths: [bigFile], mode: "analyze" });
+  it("sends files complete and numbered from the scratch folder, and records the call", async () => {
+    const result = await handleAsk(ctx, { prompt: "Summarize", paths: [bigFile], mode: "summarize" });
 
     expect(result.isError).toBeFalsy();
     const req = invoke.mock.calls[0]![0];
-    expect(req.prompt).toContain(toAtReference(bigFile));
+    expect(req.prompt).toContain(`===== FILE 1 of 1: ${bigFile} (1000 lines) =====`);
+    expect(req.prompt).toContain("1000: const line999 = 999;");
+    expect(req.prompt).not.toContain(toAtReference(bigFile));
+    expect(req).toMatchObject({ model: "gemini-3.1-flash-lite", failFast: true, timeoutMs: 180_000, yolo: false });
     expect(req.cwd).toBe(path.join(root, "scratch"));
     // The file's folder is inside the project, so the project folder alone covers both.
     expect(req.includeDirectories).toEqual([project]);
-    expect(req.timeoutMs).toBe(180_000);
-    expect(req.yolo).toBe(false);
 
-    const saved = 40_000 - "Gemini says hi".length;
-    expect(textOf(result)).toBe(
-      `Gemini says hi\n\n[gemini-claude-bridge · analyze · main-pro · 1.2s · ~${Math.round(saved / 4)} tokens of file content kept out of Claude's context]`,
-    );
+    const text = textOf(result);
+    expect(text).toMatch(/^Gemini says hi\n\n\[gemini-claude-bridge · summarize · main-model · 1\.2s · ~\d+ tokens of file content kept out of Claude's context\]/);
+    expect(text).toContain(`[followUp: "${SESSION}"]`);
     // Claude Code shows the model structuredContent INSTEAD of the text, so a successful answer
     // must not carry one, or Gemini's answer would never reach Claude.
     expect(result.structuredContent).toBeUndefined();
 
     const state = await ctx.store.read();
-    expect(state.usage).toMatchObject({ totalCalls: 1, totalErrors: 0, callsByMode: { analyze: 1 }, estimatedCharsSaved: saved });
+    expect(state.usage).toMatchObject({ totalCalls: 1, totalErrors: 0, callsByMode: { summarize: 1 } });
     expect(state.geminiCli.lastAuthOk).toBe(true);
+    expect(await ctx.history.recent(new Date(0))).toEqual([
+      expect.objectContaining({ mode: "summarize", ok: true, engine: "cli", inlineFiles: 1, referencedFiles: 0 }),
+    ]);
   });
 
   it("resolves relative paths against the project folder", async () => {
     await handleAsk(ctx, { prompt: "x", paths: [path.join("src", "big file.ts")] });
-    expect(invoke.mock.calls[0]![0].prompt).toContain(toAtReference(bigFile));
+    expect(invoke.mock.calls[0]![0].prompt).toContain(`FILE 1 of 1: ${bigFile}`);
   });
 
   it("refuses immediately when the bridge is off: no subprocess, nothing counted", async () => {
@@ -100,11 +116,7 @@ describe("gemini_ask", () => {
 
     expect(result.isError).toBe(true);
     // Both representations carry the next step, whichever one the client shows the model.
-    expect(result.structuredContent).toMatchObject({
-      ok: false,
-      errorType: "disabled",
-      nextStep: expect.stringContaining("Do the task yourself"),
-    });
+    expect(result.structuredContent).toMatchObject({ ok: false, errorType: "disabled", nextStep: expect.stringContaining("Do the task yourself") });
     expect(textOf(result)).toMatch(/Do the task yourself/);
     expect(invoke).not.toHaveBeenCalled();
     expect((await ctx.store.read()).usage.totalCalls).toBe(0);
@@ -130,6 +142,13 @@ describe("gemini_ask", () => {
     expect(state.usage.totalErrors).toBe(1);
   });
 
+  it("falls back to the next model when one is out of quota, and says so", async () => {
+    invoke.mockRejectedValueOnce(classifyFailure(1, "TerminalQuotaError: You exceeded your current quota", undefined, "limit: 0"));
+    const result = await handleAsk(ctx, { prompt: "x" });
+    expect(invoke.mock.calls.map((c) => c[0].model)).toEqual(["gemini-3.1-flash-lite", "flash"]);
+    expect(textOf(result)).toContain("[fell back past gemini-3.1-flash-lite (no quota for this model on this account)]");
+  });
+
   it("uses preferences as defaults and lets arguments override them", async () => {
     await ctx.store.update((s) => {
       s.preferences.model = "pref-model";
@@ -145,8 +164,73 @@ describe("gemini_ask", () => {
 
   it("passes the cancellation signal through to the Gemini process", async () => {
     const controller = new AbortController();
-    await handleAsk(ctx, { prompt: "x" }, controller.signal);
+    await handleAsk(ctx, { prompt: "x" }, { signal: controller.signal });
     expect(invoke.mock.calls[0]![0].signal).toBe(controller.signal);
+  });
+
+  it("answers an identical question about unchanged files from the cache", async () => {
+    await handleAsk(ctx, { prompt: "Summarize", paths: [bigFile] });
+    const second = await handleAsk(ctx, { prompt: "Summarize", paths: [bigFile] });
+    expect(invoke).toHaveBeenCalledTimes(1);
+    expect(textOf(second)).toMatch(/^Gemini says hi\n\n\[gemini-claude-bridge · ask · cached answer from/);
+    expect((await ctx.store.read()).usage.cacheHits).toBe(1);
+
+    await handleAsk(ctx, { prompt: "Summarize", paths: [bigFile], fresh: true });
+    expect(invoke).toHaveBeenCalledTimes(2);
+
+    await fs.appendFile(bigFile, "\n// edited");
+    await handleAsk(ctx, { prompt: "Summarize", paths: [bigFile] });
+    expect(invoke).toHaveBeenCalledTimes(3);
+  });
+
+  it("continues a conversation with followUp, without the cache", async () => {
+    await handleAsk(ctx, { prompt: "And the errors?", followUp: SESSION });
+    await handleAsk(ctx, { prompt: "And the errors?", followUp: SESSION });
+    expect(invoke).toHaveBeenCalledTimes(2);
+    expect(invoke.mock.calls[0]![0]).toMatchObject({ resumeSessionId: SESSION });
+    expect(invoke.mock.calls[0]![0].prompt.startsWith(FOLLOW_UP_HEADER)).toBe(true);
+  });
+
+  it("reports progress while it works", async () => {
+    const messages: string[] = [];
+    await handleAsk(ctx, { prompt: "x", paths: [bigFile] }, { report: (m) => messages.push(m) });
+    expect(messages).toEqual(["Sending 1 file(s), 1000 lines, inline to Gemini…", "Asking gemini-3.1-flash-lite…"]);
+  });
+});
+
+describe("background jobs", () => {
+  it("starts a job at once and hands the answer to gemini_result when it's ready", async () => {
+    let release!: () => void;
+    const gate = new Promise<void>((resolve) => (release = resolve));
+    invoke.mockImplementationOnce(async () => {
+      await gate;
+      return { ...ANSWER, text: "late answer" };
+    });
+
+    const started = await handleAsk(ctx, { prompt: "Long task", background: true });
+    const jobId = (started.structuredContent as { jobId: string }).jobId;
+    expect(textOf(started)).toMatch(/Started background Gemini job [a-f0-9]{8}/);
+    expect(textOf(await handleResult(ctx, { jobId }))).toMatch(/still running/);
+
+    release();
+    const done = await handleResult(ctx, { jobId, waitSeconds: 5 });
+    expect(textOf(done)).toMatch(new RegExp(`^Background job ${jobId} \\(ask: Long task\\) finished`));
+    expect(textOf(done)).toContain("late answer");
+    expect(textOf(await handleResult(ctx, {}))).toMatch(new RegExp(`${jobId} · done`));
+    expect((await ctx.history.recent(new Date(0)))[0]).toMatchObject({ background: true, ok: true });
+  });
+
+  it("refuses up front when the bridge is off or a path is wrong", async () => {
+    expect((await handleAsk(ctx, { prompt: "x", paths: ["missing.txt"], background: true })).structuredContent).toMatchObject({
+      errorType: "invalid_paths",
+    });
+    await handleToggle(ctx, { enabled: false });
+    expect((await handleAsk(ctx, { prompt: "x", background: true })).structuredContent).toMatchObject({ errorType: "disabled" });
+    expect(ctx.jobs.list()).toHaveLength(0);
+  });
+
+  it("says when a job id is unknown", async () => {
+    expect((await handleResult(ctx, { jobId: "deadbeef" })).structuredContent).toMatchObject({ errorType: "unknown_job" });
   });
 });
 
@@ -160,21 +244,25 @@ describe("gemini_bridge_toggle", () => {
 });
 
 describe("gemini_bridge_status", () => {
-  it("summarizes on/off, CLI, sign-in and usage, and forwards forceRefresh", async () => {
+  it("covers on/off, CLI, ripgrep, sign-in, models, cooldowns, speed and usage", async () => {
     await handleAsk(ctx, { prompt: "x", paths: [bigFile], mode: "review" });
+    await ctx.store.update((s) => {
+      s.modelCooldowns.pro = { until: "2026-09-11T07:00:00.000Z", reason: "daily quota used up" };
+      s.modelCooldowns.old = { until: "2026-09-01T00:00:00.000Z", reason: "expired" };
+    });
     const result = await handleStatus(ctx, { forceRefresh: true });
     const text = textOf(result);
 
     expect(refreshCli).toHaveBeenCalledWith(true);
     expect(text).toMatch(/Gemini bridge: ON/);
-    expect(text).toMatch(/Gemini CLI: installed v0\.59\.0/);
+    expect(text).toMatch(/Gemini CLI: installed v0\.59\.0 at C:\\bin\\gemini\.cmd · ripgrep: yes/);
     expect(text).toMatch(/Sign-in: OK/);
-    expect(text).toMatch(/1 call, 0 errors \(review 1\)/);
-    expect(result.structuredContent).toMatchObject({
-      enabled: true,
-      usage: { totalCalls: 1 },
-      summary: expect.stringContaining("Gemini bridge: ON"),
-    });
+    expect(text).toMatch(/Models: fast tasks gemini-3\.1-flash-lite → flash → auto; strong tasks pro → flash → gemini-3\.1-flash-lite/);
+    expect(text).toMatch(/Cooling down: pro \(daily quota used up; until 2026-09-11 07:00Z\)$/m);
+    // The test clock stands still, so durations are 0 and the overall average is left out.
+    expect(text).toMatch(/Last 7 days: 1 call \(1 ok, 0 cached, 0 failed\); pro 1 ok avg 0\.0s/);
+    expect(text).toMatch(/Usage: 1 call, 0 errors \(review 1\); 0 cache hits;/);
+    expect(result.structuredContent).toMatchObject({ enabled: true, usage: { totalCalls: 1 }, summary: expect.stringContaining("Gemini bridge: ON") });
   });
 
   it("works while the bridge is off", async () => {
@@ -192,17 +280,17 @@ describe("MCP server", () => {
     return client;
   }
 
-  it("always lists exactly the three tools with the expected schemas", async () => {
+  it("always lists the same four tools with the expected schemas", async () => {
     const client = await connect();
     const { tools } = await client.listTools();
-    expect(tools.map((t) => t.name).sort()).toEqual(["gemini_ask", "gemini_bridge_status", "gemini_bridge_toggle"]);
+    expect(tools.map((t) => t.name).sort()).toEqual(["gemini_ask", "gemini_bridge_status", "gemini_bridge_toggle", "gemini_result"]);
 
     const ask = tools.find((t) => t.name === "gemini_ask")!;
     expect(ask.inputSchema.required).toEqual(["prompt"]);
     const props = ask.inputSchema.properties as Record<string, { maxItems?: number; enum?: string[] }>;
-    expect(Object.keys(props).sort()).toEqual(["mode", "model", "paths", "prompt", "timeoutMs", "yolo"]);
+    expect(Object.keys(props).sort()).toEqual(["background", "followUp", "format", "fresh", "mode", "model", "paths", "prompt", "timeoutMs", "yolo"]);
     expect(props.paths?.maxItems).toBe(20);
-    expect(props.mode?.enum).toEqual(["ask", "analyze", "review", "refactor", "plan", "test"]);
+    expect(props.mode?.enum).toEqual(["ask", "summarize", "analyze", "review", "refactor", "plan", "test"]);
     expect(client.getInstructions()).toMatch(/gemini_bridge_toggle/);
     await client.close();
   });
@@ -214,18 +302,23 @@ describe("MCP server", () => {
     expect(result.isError).toBe(true);
     expect(result.structuredContent).toMatchObject({ errorType: "disabled" });
     expect(invoke).not.toHaveBeenCalled();
+    expect((await client.listTools()).tools).toHaveLength(4);
+    await client.close();
+  });
 
-    // Tool list stays the same while disabled.
-    expect((await client.listTools()).tools).toHaveLength(3);
+  it("streams progress notifications to a client that asks for them", async () => {
+    const client = await connect();
+    const messages: string[] = [];
+    await client.callTool({ name: "gemini_ask", arguments: { prompt: "hello" } }, undefined, {
+      onprogress: (progress) => messages.push(String(progress.message)),
+    });
+    expect(messages).toContain("Asking gemini-3.1-flash-lite…");
     await client.close();
   });
 
   it("rejects invalid arguments before doing anything", async () => {
     const client = await connect();
-    const result = (await client.callTool({
-      name: "gemini_ask",
-      arguments: { prompt: "x", model: "--yolo" },
-    })) as CallToolResult;
+    const result = (await client.callTool({ name: "gemini_ask", arguments: { prompt: "x", model: "--yolo" } })) as CallToolResult;
     expect(result.isError).toBe(true);
     expect(invoke).not.toHaveBeenCalled();
     await client.close();

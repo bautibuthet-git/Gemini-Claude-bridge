@@ -1,5 +1,5 @@
 {
-  "description": "Shows a one-line Gemini bridge status banner when a session starts. Never blocks the session.",
+  "description": "Gemini bridge: a one-line status banner at session start, and a once-per-file suggestion to delegate big files before Claude reads them whole. Neither ever blocks a session or a Read for good.",
   "hooks": {
     "SessionStart": [
       {
@@ -9,6 +9,19 @@
             "command": "node",
             "args": ["${CLAUDE_PLUGIN_ROOT}/dist/index.js", "--check"],
             "timeout": 15
+          }
+        ]
+      }
+    ],
+    "PreToolUse": [
+      {
+        "matcher": "Read",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "node",
+            "args": ["${CLAUDE_PLUGIN_ROOT}/dist/read-hook.js"],
+            "timeout": 10
           }
         ]
       }

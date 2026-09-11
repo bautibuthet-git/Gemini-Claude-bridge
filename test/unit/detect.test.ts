@@ -4,10 +4,12 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import {
   detectAuth,
   detectInstall,
+  detectRipgrep,
   refreshCliStatus,
   stripJsonComments,
   type AuthCheck,
   type InstallCheck,
+  type RipgrepStatus,
 } from "../../src/gemini/detect.js";
 import { StateStore } from "../../src/state/store.js";
 import { fakeGeminiOnPath, fakeSpawn, tempDir } from "../helpers.js";
@@ -76,7 +78,8 @@ describe("detectInstall", () => {
 
   it("doesn't spawn anything when gemini isn't on PATH", async () => {
     const { spawn, calls } = fakeSpawn(() => undefined);
-    expect(await detectInstall({ env: { PATH: dir }, spawn })).toEqual({ installed: false, path: null, version: null });
+    // ProgramFiles points at the temp dir so no real install folder gets appended to PATH.
+    expect(await detectInstall({ env: { PATH: dir, ProgramFiles: dir }, spawn })).toEqual({ installed: false, path: null, version: null });
     expect(calls).toHaveLength(0);
   });
 
@@ -87,13 +90,49 @@ describe("detectInstall", () => {
   });
 });
 
+describe("detectRipgrep", () => {
+  const binary = `rg-${process.platform}-${process.arch}${process.platform === "win32" ? ".exe" : ""}`;
+
+  it("accepts the ripgrep bundled with the Gemini CLI", async () => {
+    const vendor = path.join(dir, "npm", "node_modules", "@google", "gemini-cli", "bundle", "vendor", "ripgrep");
+    await fs.mkdir(vendor, { recursive: true });
+    await fs.writeFile(path.join(vendor, binary), "");
+    expect(detectRipgrep(path.join(dir, "npm", "gemini.cmd"), { PATH: "", ProgramFiles: dir })).toMatchObject({
+      available: true,
+      detail: "bundled with the Gemini CLI",
+    });
+  });
+
+  it("rejects an rg outside the folders the Gemini CLI trusts, like it does", async () => {
+    await fs.writeFile(path.join(dir, "rg"), "");
+    await fs.writeFile(path.join(dir, "rg.exe"), "");
+    // ProgramFiles points somewhere else, so the temp folder is neither augmented nor trusted.
+    expect(detectRipgrep(null, { PATH: dir, PATHEXT: ".EXE", ProgramFiles: path.join(dir, "pf") })).toMatchObject({
+      available: false,
+      detail: expect.stringMatching(/outside Program Files/),
+    });
+  });
+
+  it("reports a missing rg", () => {
+    expect(detectRipgrep(null, { PATH: dir, ProgramFiles: dir })).toMatchObject({ available: false, path: null });
+  });
+});
+
 describe("refreshCliStatus", () => {
   let store: StateStore;
   let now: Date;
   let install: ReturnType<typeof vi.fn<() => Promise<InstallCheck>>>;
   let auth: ReturnType<typeof vi.fn<() => AuthCheck>>;
+  const RG: RipgrepStatus = { available: true, path: "C:\\Program Files\\rg.exe", detail: "installed" };
   const run = (force = false) =>
-    refreshCliStatus(store, { force, now: () => now, detectInstall: install, detectAuth: auth, findPath: () => "C:\\bin\\gemini.cmd" });
+    refreshCliStatus(store, {
+      force,
+      now: () => now,
+      detectInstall: install,
+      detectAuth: auth,
+      findPath: () => "C:\\bin\\gemini.cmd",
+      detectRipgrep: () => RG,
+    });
 
   beforeEach(() => {
     store = new StateStore(path.join(dir, "state.json"));
@@ -103,7 +142,7 @@ describe("refreshCliStatus", () => {
   });
 
   it("checks once, then serves the cached result within the TTL", async () => {
-    expect(await run()).toMatchObject({ installed: true, version: "0.59.0", authOk: true, fromCache: false });
+    expect(await run()).toMatchObject({ installed: true, version: "0.59.0", authOk: true, fromCache: false, ripgrep: RG });
     now = new Date(now.getTime() + 60_000);
     expect(await run()).toMatchObject({ installed: true, version: "0.59.0", authOk: true, fromCache: true });
     expect(install).toHaveBeenCalledTimes(1);

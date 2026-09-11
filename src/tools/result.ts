@@ -1,5 +1,5 @@
 import type { CallToolResult } from "@modelcontextprotocol/sdk/types.js";
-import { BridgeError, ERROR_HINTS, errorMessage, type BridgeErrorType } from "../util/errors.js";
+import { asBridgeError, ERROR_HINTS, type BridgeError, type BridgeErrorType } from "../util/errors.js";
 
 /**
  * Claude Code hands the model a tool's `structuredContent` INSTEAD of its text blocks, so
@@ -29,7 +29,7 @@ export function errorResult(
 }
 
 export function toBridgeError(err: unknown): BridgeError {
-  return err instanceof BridgeError ? err : new BridgeError("gemini_error", errorMessage(err));
+  return asBridgeError(err);
 }
 
 /** Prepends the one-time "state file was corrupt and got reset" warning, if there is one. */

@@ -2,7 +2,8 @@ import type { ChildProcess, SpawnOptions } from "node:child_process";
 import crossSpawn from "cross-spawn";
 import treeKill from "tree-kill";
 import { BridgeError, errorMessage, isErrnoException } from "../util/errors.js";
-import { getEnv } from "../util/paths.js";
+import { getEnv, withAugmentedPath } from "../util/paths.js";
+import { isModelUnavailable, isTransient, parseQuota } from "./models.js";
 
 export type SpawnFn = (command: string, args: readonly string[], options: SpawnOptions) => ChildProcess;
 export type KillFn = (pid: number, signal: string, callback?: (error?: Error) => void) => void;
@@ -14,9 +15,20 @@ export function geminiCommand(env: NodeJS.ProcessEnv = process.env): string {
   return getEnv(env, GEMINI_BIN_ENV)?.trim() || "gemini";
 }
 
+/**
+ * Environment for every Gemini process: standard install folders appended to PATH (Claude Code
+ * may predate them), and no self-relaunch — otherwise the CLI starts Node twice per call.
+ * Measured: 6.9s → 5.4s warm, 19.6s → 11.7s cold.
+ */
+export function geminiEnv(base: NodeJS.ProcessEnv = process.env): NodeJS.ProcessEnv {
+  return { ...withAugmentedPath(base), GEMINI_CLI_NO_RELAUNCH: "true" };
+}
+
 const MAX_CAPTURE_BYTES = 16 * 1024 * 1024;
 /** After a kill, stop waiting for 'close' if a grandchild keeps the pipes open. */
 const KILL_GRACE_MS = 5_000;
+/** Once the watcher spots a fatal error, keep reading briefly: its details ("limit: 0") follow. */
+const WATCH_GRACE_MS = 600;
 
 export interface RunOptions {
   cwd?: string;
@@ -27,6 +39,9 @@ export interface RunOptions {
   spawn?: SpawnFn;
   kill?: KillFn;
   killGraceMs?: number;
+  /** Sees the recent stderr; returning a reason stops the process early. */
+  watch?: (recentStderr: string) => string | null;
+  watchGraceMs?: number;
 }
 
 export interface RunResult {
@@ -36,14 +51,16 @@ export interface RunResult {
   stderr: string;
   timedOut: boolean;
   aborted: boolean;
+  /** Why the watcher stopped the process, if it did. */
+  stoppedBy: string | null;
   durationMs: number;
 }
 
 /**
  * Spawns a process with cross-spawn (correct .cmd resolution on Windows, no shell: true),
  * writes `input` to stdin, captures output, and enforces a hard timeout by killing the whole
- * process tree — Windows has no POSIX process groups, and gemini.cmd → node → relaunched node
- * would otherwise survive a plain kill.
+ * process tree — Windows has no POSIX process groups, and gemini.cmd → node would otherwise
+ * survive a plain kill.
  */
 export function runProcess(command: string, args: readonly string[], opts: RunOptions): Promise<RunResult> {
   const spawn = opts.spawn ?? (crossSpawn as unknown as SpawnFn);
@@ -66,32 +83,54 @@ export function runProcess(command: string, args: readonly string[], opts: RunOp
 
     const stdout = new Capture();
     const stderr = new Capture();
-    child.stdout?.on("data", (chunk: Buffer) => stdout.push(chunk));
-    child.stderr?.on("data", (chunk: Buffer) => stderr.push(chunk));
-
     let settled = false;
     let timedOut = false;
     let aborted = false;
     let killRequested = false;
+    let stoppedBy: string | null = null;
+    let recentStderr = "";
     let graceTimer: NodeJS.Timeout | undefined;
+    let watchTimer: NodeJS.Timeout | undefined;
+
+    child.stdout?.on("data", (chunk: Buffer) => stdout.push(chunk));
+    child.stderr?.on("data", (chunk: Buffer) => {
+      stderr.push(chunk);
+      if (!opts.watch || stoppedBy !== null || killRequested) return;
+      recentStderr = (recentStderr + chunk.toString("utf8")).slice(-4096);
+      const reason = opts.watch(recentStderr);
+      if (reason) {
+        stoppedBy = reason;
+        watchTimer = setTimeout(terminate, opts.watchGraceMs ?? WATCH_GRACE_MS);
+      }
+    });
 
     const cleanup = () => {
       settled = true;
       clearTimeout(timer);
       if (graceTimer) clearTimeout(graceTimer);
+      if (watchTimer) clearTimeout(watchTimer);
       opts.signal?.removeEventListener("abort", onAbort);
     };
     const finish = (code: number | null, signal: NodeJS.Signals | null) => {
       if (settled) return;
       cleanup();
-      resolve({ code, signal, stdout: stdout.text(), stderr: stderr.text(), timedOut, aborted, durationMs: Date.now() - started });
+      resolve({
+        code,
+        signal,
+        stdout: stdout.text(),
+        stderr: stderr.text(),
+        timedOut,
+        aborted,
+        stoppedBy,
+        durationMs: Date.now() - started,
+      });
     };
-    const terminate = () => {
-      if (killRequested) return;
+    function terminate() {
+      if (killRequested || settled) return;
       killRequested = true;
       graceTimer = setTimeout(() => finish(null, "SIGKILL"), opts.killGraceMs ?? KILL_GRACE_MS);
       if (child.pid !== undefined) kill(child.pid, "SIGKILL", () => undefined);
-    };
+    }
     const onAbort = () => {
       aborted = true;
       terminate();
@@ -141,6 +180,12 @@ export interface GeminiRequest {
   cwd: string;
   includeDirectories?: readonly string[];
   signal?: AbortSignal;
+  /** Continue this Gemini session (a follow-up) instead of starting a new one. */
+  resumeSessionId?: string;
+  /** Stop as soon as stderr shows a quota or unknown-model error, so another model can be tried. */
+  failFast?: boolean;
+  /** Told when the CLI starts waiting out a rate limit, so the wait isn't silent. */
+  onNotice?: (message: string) => void;
 }
 
 export interface GeminiResponse {
@@ -149,6 +194,8 @@ export interface GeminiResponse {
   durationMs: number;
   exitCode: number;
   warnings: string[];
+  /** Gemini's session id: pass it back as a follow-up to continue the conversation. */
+  sessionId: string | null;
 }
 
 export interface InvokeDeps {
@@ -163,7 +210,9 @@ export interface InvokeDeps {
  * on Windows `gemini` is a .cmd shim run through cmd.exe, which cuts arguments at the first
  * newline and caps the command line at ~8 KB. Piped stdin alone puts the CLI in headless mode.
  */
-export function buildGeminiArgs(req: Pick<GeminiRequest, "model" | "yolo" | "includeDirectories">): string[] {
+export function buildGeminiArgs(
+  req: Pick<GeminiRequest, "model" | "yolo" | "includeDirectories" | "resumeSessionId">,
+): string[] {
   const args = [
     "--output-format",
     "json",
@@ -177,22 +226,56 @@ export function buildGeminiArgs(req: Pick<GeminiRequest, "model" | "yolo" | "inc
   ];
   // `--flag=value` keeps a value that starts with "-" from being parsed as another flag.
   if (req.model) args.push(`--model=${req.model}`);
+  if (req.resumeSessionId) args.push(`--resume=${req.resumeSessionId}`);
   for (const dir of req.includeDirectories ?? []) args.push(`--include-directories=${dir}`);
   return args;
 }
 
+/** Errors worth abandoning a model for immediately instead of waiting out the CLI's own retries. */
+const FAIL_FAST_PATTERN =
+  /(TerminalQuotaError|RetryableQuotaError|RESOURCE_EXHAUSTED|exceeded your current quota|exhausted your daily quota|ModelNotFoundError|is not found for API version)/i;
+
+export function watchForModelFailure(recentStderr: string): string | null {
+  return FAIL_FAST_PATTERN.exec(recentStderr)?.[0] ?? null;
+}
+
+/**
+ * The CLI announces when it waits out a per-minute limit ("Please retry in 54.8s … Retrying
+ * after 64395ms"). Measured on a free key: a second big question within a minute waited 64s.
+ */
+export const RETRY_WAIT_PATTERN = /(Retrying after \d+\s*ms|retry in\s+[\d.]+\s*s)/i;
+
+export function describeWait(recentStderr: string): string {
+  const retryMs = /Retrying after (\d+)\s*ms/i.exec(recentStderr);
+  const retryS = /retry in\s+([\d.]+)\s*s/i.exec(recentStderr);
+  const seconds = retryMs ? Math.round(Number(retryMs[1]) / 1000) : retryS ? Math.round(Number(retryS[1])) : null;
+  return `Gemini hit its per-minute quota; the Gemini CLI waits${seconds ? ` ~${seconds}s` : ""} and retries by itself…`;
+}
+
 export async function invokeGemini(req: GeminiRequest, deps: InvokeDeps = {}): Promise<GeminiResponse> {
   const command = deps.command ?? geminiCommand(deps.env);
+  let noticed = false;
+  // Cut a failing model short when another one can take over; otherwise just say it's waiting.
+  const watch = (recentStderr: string): string | null => {
+    const failure = watchForModelFailure(recentStderr);
+    if (failure && req.failFast) return failure;
+    if (!noticed && RETRY_WAIT_PATTERN.test(recentStderr)) {
+      noticed = true;
+      req.onNotice?.(describeWait(recentStderr));
+    }
+    return null;
+  };
   let result: RunResult;
   try {
     result = await runProcess(command, buildGeminiArgs(req), {
       cwd: req.cwd,
       input: req.prompt,
       timeoutMs: req.timeoutMs,
-      env: deps.env,
+      env: geminiEnv(deps.env ?? process.env),
       signal: req.signal,
       spawn: deps.spawn,
       kill: deps.kill,
+      watch,
     });
   } catch (err) {
     if (isErrnoException(err, "ENOENT")) {
@@ -204,6 +287,7 @@ export async function invokeGemini(req: GeminiRequest, deps: InvokeDeps = {}): P
 }
 
 interface GeminiJson {
+  session_id?: unknown;
   response?: unknown;
   stats?: { models?: Record<string, { tokens?: { candidates?: number; total?: number } }> };
   error?: { type?: string; message?: string; code?: number | string };
@@ -220,7 +304,6 @@ const EXIT_NOT_FOUND = new Set([9009, 127]);
 
 const AUTH_PATTERN =
   /(authenticat|auth method|not logged in|\blog ?in\b|\bsign ?in\b|credential|oauth|api key|unauthenticated|invalid_grant|\b401\b)/i;
-const QUOTA_PATTERN = /(quota|rate.?limit|resource_exhausted|\b429\b|too many requests)/i;
 /** Google refusing the account's plan, e.g. IneligibleTierError telling users to move to Antigravity. */
 const INELIGIBLE_PATTERN =
   /(ineligibletier|unsupported_client|no longer supported for gemini code assist|antigravity)/i;
@@ -234,6 +317,23 @@ const NOISE_PATTERNS = [
 ];
 
 export function interpretResult(r: RunResult, timeoutMs: number): GeminiResponse {
+  const json = parseGeminiJson(r.stdout) ?? parseGeminiJson(r.stderr);
+  const exitCode = r.code ?? -1;
+  const warnings = Array.isArray(json?.warnings) ? json.warnings.filter((w): w is string => typeof w === "string") : [];
+  const sessionId = typeof json?.session_id === "string" ? json.session_id : null;
+
+  // A complete answer wins over the exit code. On Windows the CLI can crash while shutting down
+  // after printing it (a libuv assertion in src\win\async.c, exit 127) — which would otherwise
+  // read as "not installed" and throw a good answer away.
+  if (typeof json?.response === "string" && json.response.trim() && !json.error) {
+    return { text: json.response.trim(), model: primaryModel(json.stats), durationMs: r.durationMs, exitCode, warnings, sessionId };
+  }
+
+  // Stopped on purpose by the watcher: classify from everything read so far.
+  if (r.stoppedBy) {
+    const message = json?.error?.message?.trim() || summarizeOutput(r.stderr) || r.stoppedBy;
+    throw classifyFailure(r.code ?? -1, message, json?.error?.type, r.stderr);
+  }
   if (r.timedOut) {
     throw new BridgeError(
       "timeout",
@@ -247,39 +347,52 @@ export function interpretResult(r: RunResult, timeoutMs: number): GeminiResponse
     });
   }
 
-  const exitCode = r.code ?? -1;
-  const json = parseGeminiJson(r.stdout) ?? parseGeminiJson(r.stderr);
-
   if (exitCode === 0 && !json?.error) {
-    const text = (typeof json?.response === "string" ? json.response : json ? "" : r.stdout).trim();
+    // No JSON document at all: take plain stdout, if there is any.
+    const text = (json ? "" : r.stdout).trim();
     if (!text) throw new BridgeError("gemini_error", "Gemini returned an empty response.", { exitCode });
-    const warnings = Array.isArray(json?.warnings) ? json.warnings.filter((w): w is string => typeof w === "string") : [];
-    return { text, model: primaryModel(json?.stats), durationMs: r.durationMs, exitCode, warnings };
+    return { text, model: null, durationMs: r.durationMs, exitCode, warnings, sessionId };
   }
 
   const message =
     json?.error?.message?.trim() || summarizeOutput(r.stderr) || summarizeOutput(r.stdout) || "no error output";
-  throw classifyFailure(exitCode, message, json?.error?.type);
+  throw classifyFailure(exitCode, message, json?.error?.type, r.stderr);
 }
 
-export function classifyFailure(exitCode: number, message: string, geminiErrorType?: string): BridgeError {
+/**
+ * Maps a failure to an error type plus `details.failure` ("quota" | "unavailable" | "transient"),
+ * which tells the runner whether to cool the model down, try the next one, or retry.
+ * `raw` is the full CLI output: quota details ("limit: 0", "daily") often sit outside the headline.
+ */
+export function classifyFailure(exitCode: number, message: string, geminiErrorType?: string, raw = ""): BridgeError {
   const details = { exitCode, ...(geminiErrorType ? { geminiErrorType } : {}) };
+  const haystack = `${message}\n${raw}`;
   if (EXIT_NOT_FOUND.has(exitCode)) {
     return new BridgeError("not_installed", `The Gemini CLI could not be started: ${message}`, details);
   }
   // Google refusing the account's tier looks like a crash, but the fix is an auth change.
-  if (INELIGIBLE_PATTERN.test(message)) {
+  if (INELIGIBLE_PATTERN.test(haystack)) {
     return new BridgeError("not_authenticated", `Google rejected this Gemini CLI for that account: ${message}`, {
       ...details,
       nextStep:
         "Google refused this Gemini CLI for the signed-in account's tier. Tell the user to switch the Gemini CLI to another auth method: create an API key at https://aistudio.google.com/apikey, put GEMINI_API_KEY=<key> in ~/.gemini/.env, and select \"Gemini API key\" via /auth inside `gemini`. Meanwhile, do the task yourself.",
     });
   }
+  const quota = parseQuota(haystack);
+  if (quota) {
+    return new BridgeError("quota", `Gemini quota or rate limit reached: ${message}`, { ...details, failure: "quota", quota });
+  }
+  if (isModelUnavailable(haystack)) {
+    return new BridgeError("gemini_error", `This Gemini model is not available: ${message}`, {
+      ...details,
+      failure: "unavailable",
+    });
+  }
   if (exitCode === EXIT_AUTH || AUTH_PATTERN.test(message)) {
     return new BridgeError("not_authenticated", `The Gemini CLI is not signed in: ${message}`, details);
   }
-  if (QUOTA_PATTERN.test(message)) {
-    return new BridgeError("gemini_error", `Gemini quota or rate limit reached: ${message}`, details);
+  if (isTransient(haystack)) {
+    return new BridgeError("gemini_error", `Gemini had a temporary problem: ${message}`, { ...details, failure: "transient" });
   }
   const label =
     exitCode === EXIT_INPUT
@@ -302,8 +415,8 @@ export function parseGeminiJson(text: string): GeminiJson | null {
   const parsed = tryParseObject(trimmed);
   if (parsed) return parsed;
 
-  // The document is pretty-printed, so it starts with "{" at the start of a line and ends with a
-  // lone "}". Both can be surrounded by log lines, so look for a slice that actually parses.
+  // The document starts with "{" at the start of a line and ends with a lone "}". Both can be
+  // surrounded by log lines, so look for a slice that actually parses.
   const lines = trimmed.split(/\r?\n/);
   for (let start = 0; start < lines.length; start++) {
     if (!lines[start]?.startsWith("{")) continue;

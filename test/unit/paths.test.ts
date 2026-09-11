@@ -2,7 +2,14 @@ import fs from "node:fs/promises";
 import os from "node:os";
 import path from "node:path";
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
-import { countLines, estimateChars, findOnPath, includeDirectoriesFor, resolveInputPaths } from "../../src/util/paths.js";
+import {
+  countLines,
+  estimateChars,
+  findOnPath,
+  includeDirectoriesFor,
+  resolveInputPaths,
+  withAugmentedPath,
+} from "../../src/util/paths.js";
 import { fakeGeminiOnPath, tempDir } from "../helpers.js";
 
 let dir: string;
@@ -84,6 +91,25 @@ describe("estimateChars", () => {
     await fs.writeFile(path.join(project, ".git", "obj"), "z".repeat(5_000));
 
     expect(await estimateChars([{ input: "p", absolute: project, isDirectory: true }])).toBe(100);
+  });
+});
+
+describe("withAugmentedPath", () => {
+  it.runIf(process.platform === "win32")(
+    "appends install folders that exist but are missing from PATH, keeping the variable's own name and no duplicates",
+    async () => {
+      await fs.mkdir(path.join(dir, "nodejs"));
+      await fs.mkdir(path.join(dir, "WinGet", "Links"), { recursive: true });
+      const out = withAugmentedPath({ Path: "C:\\Windows", ProgramFiles: dir }, "win32");
+      expect(out.Path).toBe(["C:\\Windows", path.join(dir, "nodejs"), path.join(dir, "WinGet", "Links")].join(";"));
+      expect(out.PATH).toBeUndefined();
+      expect(withAugmentedPath(out, "win32").Path).toBe(out.Path);
+    },
+  );
+
+  it("leaves PATH alone when nothing is missing", () => {
+    const env = { PATH: "/usr/bin", ProgramFiles: "Z:\\nowhere" };
+    expect(withAugmentedPath(env, "win32")).toBe(env);
   });
 });
 

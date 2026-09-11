@@ -38,6 +38,17 @@ describe("StateStore", () => {
     expect(reread.usage.callsByMode).toEqual({ review: 2 });
   });
 
+  it("never shares default objects between parses", () => {
+    const first = defaultState();
+    first.usage.callsByMode.ask = 5;
+    first.modelCooldowns.pro = { until: "x", reason: "y" };
+    first.preferences.models.fast.push("zzz");
+    const second = defaultState();
+    expect(second.usage.callsByMode).toEqual({});
+    expect(second.modelCooldowns).toEqual({});
+    expect(second.preferences.models.fast).not.toContain("zzz");
+  });
+
   it("fills in sections missing from a partial or older file", async () => {
     await fs.mkdir(path.dirname(file), { recursive: true });
     await fs.writeFile(file, JSON.stringify({ enabled: false }));
